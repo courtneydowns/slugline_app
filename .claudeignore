@@ -1,0 +1,53 @@
+# .claudeignore
+# Files and directories Claude should not read, index, or modify.
+
+# --- Large / binary / generated ---
+node_modules/
+out/
+dist/
+dist-electron/
+release/
+.vite/
+coverage/
+
+# --- Secrets and credentials ---
+.env
+.env.*
+*.env
+# The encrypted config lives in macOS userData, not here — but just in case:
+config.json
+encrypted-config.json
+
+# --- Database files ---
+# Live copies are in ~/Library/Application Support/Slugline/
+# Never modify these directly — use db.js
+*.db
+*.db-shm
+*.db-wal
+
+# --- Build artifacts ---
+*.tsbuildinfo
+*.map
+
+# --- Logs ---
+*.log
+logs/
+
+# --- OS noise ---
+.DS_Store
+Thumbs.db
+
+# --- Packaged app output ---
+*.dmg
+*.exe
+*.AppImage
+*.zip
+
+# --- Seed / one-off scripts ---
+*-seed.js
+seed-*.js
+
+# --- Lock files (read but don't edit) ---
+package-lock.json
+yarn.lock
+pnpm-lock.yaml

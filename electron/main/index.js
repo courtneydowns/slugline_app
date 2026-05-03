@@ -1,0 +1,227 @@
+const { app, BrowserWindow, ipcMain, globalShortcut, Menu, dialog, shell } = require('electron')
+const path = require('path')
+const { is } = require('@electron-toolkit/utils')
+
+let mainWindow = null
+let currentProjectId = null
+
+function createWindow() {
+  mainWindow = new BrowserWindow({
+    width: 1400,
+    height: 900,
+    minWidth: 900,
+    minHeight: 600,
+    titleBarStyle: 'hiddenInset',
+    trafficLightPosition: { x: 16, y: 16 },
+    backgroundColor: '#0D0D0F',
+    show: false,
+    webPreferences: {
+      preload: path.join(__dirname, '../preload/index.js'),
+      sandbox: false,
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  })
+
+  mainWindow.once('ready-to-show', () => mainWindow.show())
+
+  if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
+    mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
+  } else {
+    mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'))
+  }
+}
+
+function buildMenu() {
+  const template = [
+    {
+      label: 'Slugline',
+      submenu: [
+        { label: 'About Slugline', role: 'about' },
+        { type: 'separator' },
+        { label: 'Settings', accelerator: 'Cmd+,', click: () => mainWindow.webContents.send('menu:settings') },
+        { type: 'separator' },
+        { role: 'quit' }
+      ]
+    },
+    {
+      label: 'File',
+      submenu: [
+        { label: 'New Project', accelerator: 'Cmd+N', click: () => mainWindow.webContents.send('menu:new-project') },
+        { type: 'separator' },
+        { label: 'Export…', accelerator: 'Cmd+E', click: () => mainWindow.webContents.send('menu:export') },
+        { label: 'Manual Backup', accelerator: 'Cmd+Shift+S', click: () => mainWindow.webContents.send('menu:manual-backup') },
+        { label: '⚠ Panic Export', accelerator: 'Cmd+Shift+P', click: () => mainWindow.webContents.send('menu:panic-export') }
+      ]
+    },
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        { role: 'selectAll' },
+        { type: 'separator' },
+        { label: 'Find', accelerator: 'Cmd+F', click: () => mainWindow.webContents.send('menu:find') }
+      ]
+    },
+    {
+      label: 'Write',
+      submenu: [
+        { label: 'Scene Heading', accelerator: 'Cmd+1', click: () => mainWindow.webContents.send('editor:set-element', 'scene-heading') },
+        { label: 'Action', accelerator: 'Cmd+2', click: () => mainWindow.webContents.send('editor:set-element', 'action') },
+        { label: 'Character', accelerator: 'Cmd+3', click: () => mainWindow.webContents.send('editor:set-element', 'character') },
+        { label: 'Dialogue', accelerator: 'Cmd+4', click: () => mainWindow.webContents.send('editor:set-element', 'dialogue') },
+        { label: 'Parenthetical', accelerator: 'Cmd+5', click: () => mainWindow.webContents.send('editor:set-element', 'parenthetical') },
+        { label: 'Transition', accelerator: 'Cmd+6', click: () => mainWindow.webContents.send('editor:set-element', 'transition') },
+        { type: 'separator' },
+        { label: 'Read Aloud Selection', click: () => mainWindow.webContents.send('editor:read-aloud') },
+        { label: 'Analyze Scene', accelerator: 'Cmd+Shift+A', click: () => mainWindow.webContents.send('menu:analyze-scene') },
+        { label: 'Dialogue Coach', accelerator: 'Cmd+Shift+D', click: () => mainWindow.webContents.send('menu:dialogue-coach') }
+      ]
+    },
+    {
+      label: 'View',
+      submenu: [
+        { label: 'Toggle Distraction-Free', accelerator: 'Cmd+Shift+F', click: () => mainWindow.webContents.send('view:distraction-free') },
+        { label: 'Toggle Chat Panel', accelerator: 'Cmd+Shift+C', click: () => mainWindow.webContents.send('view:toggle-chat') },
+        { label: 'Toggle Story Bible', accelerator: 'Cmd+Shift+B', click: () => mainWindow.webContents.send('view:toggle-bible') },
+        { label: 'Read-Through Preview', accelerator: 'Cmd+Shift+R', click: () => mainWindow.webContents.send('view:readthrough') },
+        { type: 'separator' },
+        { role: 'toggleDevTools' }
+      ]
+    },
+    { label: 'Window', submenu: [{ role: 'minimize' }, { role: 'zoom' }, { role: 'front' }] }
+  ]
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template))
+}
+
+app.whenReady().then(() => {
+  createWindow()
+  buildMenu()
+
+  // Register panic export global shortcut as backup
+  globalShortcut.register('CommandOrControl+Shift+P', () => {
+    mainWindow?.webContents.send('menu:panic-export')
+  })
+
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+  })
+})
+
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') app.quit()
+})
+
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll()
+})
+
+// ─── Register all IPC handlers ────────────────────────────────────────────────
+
+const db = require('./db')
+const config = require('./config')
+const claude = require('./ipc-claude')
+const backup = require('./ipc-backup')
+const exportHandler = require('./ipc-export')
+
+// Config
+ipcMain.handle('config:has-api-key', () => config.hasApiKey())
+ipcMain.handle('config:get-preferences', () => config.getPreferences())
+ipcMain.handle('config:set-preferences', (e, prefs) => config.setPreferences(prefs))
+
+// Projects
+ipcMain.handle('projects:get-all', () => db.getAllProjects())
+ipcMain.handle('projects:get', (e, id) => db.getProject(id))
+ipcMain.handle('projects:create', (e, data) => db.createProject(data))
+ipcMain.handle('projects:update', (e, { id, data }) => db.updateProject(id, data))
+ipcMain.handle('projects:delete', (e, id) => db.deleteProject(id))
+
+// Documents
+ipcMain.handle('documents:get-all', (e, projectId) => db.getDocuments(projectId))
+ipcMain.handle('documents:get', (e, id) => db.getDocument(id))
+ipcMain.handle('documents:create', (e, data) => db.createDocument(data))
+ipcMain.handle('documents:update', (e, { id, data }) => db.updateDocument(id, data))
+
+// Characters
+ipcMain.handle('characters:get-all', (e, projectId) => db.getCharacters(projectId))
+ipcMain.handle('characters:upsert', (e, data) => db.upsertCharacter(data))
+ipcMain.handle('characters:delete', (e, id) => db.deleteCharacter(id))
+
+// World building
+ipcMain.handle('world:get-all', (e, projectId) => db.getWorldBuilding(projectId))
+ipcMain.handle('world:upsert', (e, data) => db.upsertWorldBuilding(data))
+ipcMain.handle('world:delete', (e, id) => db.deleteWorldBuilding(id))
+
+// Beat sheet
+ipcMain.handle('beats:get', (e, projectId) => db.getBeatSheet(projectId))
+ipcMain.handle('beats:upsert', (e, data) => db.upsertBeat(data))
+ipcMain.handle('beats:init', (e, { projectId, format }) => db.initializeBeatSheet(projectId, format))
+
+// Chat
+ipcMain.handle('chat:get-history', (e, { projectId, context }) => db.getChatHistory(projectId, context))
+ipcMain.handle('chat:clear', (e, { projectId, context }) => db.clearChatHistory(projectId, context))
+
+// Brainstorm
+ipcMain.handle('brainstorm:get-all', (e, projectId) => db.getBrainstormEntries(projectId))
+ipcMain.handle('brainstorm:add', (e, data) => db.addBrainstormEntry(data))
+ipcMain.handle('brainstorm:update', (e, { id, data }) => db.updateBrainstormEntry(id, data))
+ipcMain.handle('brainstorm:delete', (e, id) => db.deleteBrainstormEntry(id))
+
+// Research
+ipcMain.handle('research:get-all', (e, projectId) => db.getResearch(projectId))
+ipcMain.handle('research:delete', (e, id) => db.deleteResearch(id))
+
+// Sessions
+ipcMain.handle('sessions:get-today', (e, projectId) => db.getTodaySession(projectId))
+ipcMain.handle('sessions:upsert', (e, { projectId, data }) => db.upsertSession(projectId, data))
+ipcMain.handle('sessions:get-history', (e, projectId) => db.getSessionHistory(projectId))
+
+// Tokens
+ipcMain.handle('tokens:get-usage', (e, projectId) => db.getTokenUsage(projectId))
+
+// Claude
+ipcMain.handle('claude:validate-key', claude.handleValidateApiKey)
+ipcMain.handle('claude:chat', claude.handleChat)
+ipcMain.handle('claude:inline-suggest', claude.handleInlineSuggestion)
+ipcMain.handle('claude:full-rewrite', claude.handleFullRewrite)
+ipcMain.handle('claude:tone-adjust', claude.handleToneAdjust)
+ipcMain.handle('claude:scene-analysis', claude.handleSceneAnalysis)
+ipcMain.handle('claude:dialogue-coach', claude.handleDialogueCoach)
+ipcMain.handle('claude:development-question', claude.handleDevelopmentQuestion)
+ipcMain.handle('claude:generate-story-bible', claude.handleGenerateStoryBible)
+ipcMain.handle('claude:logline-assist', claude.handleLoglineAssist)
+ipcMain.handle('claude:research-ingest', claude.handleResearchIngest)
+ipcMain.handle('claude:auto-tag', claude.handleAutoTag)
+ipcMain.handle('claude:writing-prompt', claude.handleWritingPrompt)
+ipcMain.handle('claude:tv-vs-feature', claude.handleTvVsFeature)
+ipcMain.handle('claude:beat-sheet-analysis', claude.handleBeatSheetAnalysis)
+ipcMain.handle('claude:estimate-tokens', claude.handleEstimateTokens)
+
+// Backup
+ipcMain.handle('backup:panic', backup.handlePanicExport)
+ipcMain.handle('backup:manual', backup.handleManualBackup)
+ipcMain.handle('backup:create-snapshot', backup.handleCreateSnapshot)
+ipcMain.handle('backup:get-snapshots', backup.handleGetSnapshots)
+ipcMain.handle('backup:restore', backup.handleRestoreSnapshot)
+
+// Export / Import
+ipcMain.handle('export:export', exportHandler.handleExport)
+ipcMain.handle('export:import', exportHandler.handleImport)
+
+// File dialog
+ipcMain.handle('dialog:open-file', async (e, options) => {
+  const result = await dialog.showOpenDialog(options || {})
+  return result
+})
+
+ipcMain.handle('dialog:open-folder', async () => {
+  const result = await dialog.showOpenDialog({ properties: ['openDirectory'] })
+  return result.canceled ? null : result.filePaths[0]
+})
+
+ipcMain.handle('shell:open-path', (e, p) => shell.openPath(p))

@@ -1,0 +1,160 @@
+{
+  "project": {
+    "title": "REVIVAL",
+    "format": "pilot",
+    "genre": "Elevated Horror / Drama",
+    "tone": "Flanagan register — human, systemic, emotionally resolving without literal resolution. Cinematic, grounded, slow dread. The horror arrives as a consequence of who people already are.",
+    "logline": "When a deliberately contaminated heroin supply turns Narcan into an activation mechanism for a transformative virus, a newly sober paramedic in a rust belt city becomes the unknowing architect of an outbreak that forces America to confront the question it has been avoiding for decades: did we ever actually want to save these people?",
+    "premise": "A virus deliberately introduced into the heroin supply kills users on injection. Narcan revival activates the virus. The revived enter a transition period — invisible at first, accumulating in micro-behaviors that only someone who has catalogued enough cases can eventually read — culminating in full reanimation as infected with purely predatory cunning. No emotional residue. No memory. Singularly purposeful. They mirror the mindset of active addiction: ruthless, adaptive, willing to do anything and hurt anyone for the next fix. The infected are specifically drawn to naloxone/Narcan carriers, making harm reduction infrastructure the most dangerous places to be."
+  },
+  "characters": [
+    {
+      "name": "Megan",
+      "role": "Protagonist — Paramedic/EMT, 9 months sober",
+      "arc": "Season 1: Unknowing architect of the outbreak. Her act of care (administering Narcan to Diane) created the infected version of the person who saved her life. She carries this guilt for 16 episodes. Season 2: Develops specific and terrible expertise at reading the transition pattern — which isolates her completely and makes her irreplaceable and therefore hunted. Arc resolves: guilt faced, identity clarified, choice made.",
+      "traits": "Late 20s. Female. Deliberately common name — audience projects onto her. Garbage can addict: pills brought her to her knees, alcoholism not yet fully accepted (kept her job, never lost anything she could point to). 9 months sober — fragile, white-knuckling it, actively questioning whether she is actually an addict. This questioning IS the double meaning: every time she doubts it, the audience is watching someone unknowingly describe the infected. Physical: low body weight, loosely fitting clothes, skin in partial recovery with gray undertone fading, hair growing back unevenly (kept short), hands look older than face — track marks mostly healed, veins visibly damaged, wears long sleeves when she can. Eyes clear but hypervigilant. Moves carefully, like someone still negotiating the terms of reoccupying her own body.",
+      "relationships": "Diane (sponsor — Megan administers Narcan that infects her, carries this guilt for 16 episodes). Jordan (sponsee — took him on too early, 6 weeks, genuine love and fragile ego in equal measure). Ray (partner — primary support in absence of a sponsor, non-recovery world).",
+      "notes": "BOTTOM: Still working as a paramedic while using. Responded to a call — patient was a woman her own age, dying. The woman looked up and asked 'you okay?' A dying woman checking on the paramedic. Megan held it together, did not use that night, called the number on day three. Not a dramatic bottom — a mirror. CENTRAL VISUAL MOTIF: Megan kneeling over someone — established at her bottom, repeating through every Narcan call, culminating in the parking lot with Diane. Accumulates meaning every time. SERVICE WORK: Chairs Thursday meeting, takes commitment into rehab Sunday mornings (3 months). ALCOHOLISM BLIND SPOT: Knows cross-addiction is real, knows what the program says, still does not land — the gap between correct information and full integration is what the series is about."
+    },
+    {
+      "name": "Jordan",
+      "role": "Sponsee — 20 years old, transition clock already running",
+      "arc": "His transition clock has been running the entire time he and Megan have known each other — revived 6 weeks before the series begins. The micro-behaviors Megan will eventually learn to read are already present in their first scene together — she reads them as addiction behavior because that is what she has been trained to see. Whether anything he writes in his step 4 is still fully him is never answered directly.",
+      "traits": "20 years old. Black. Middle-class family (father in municipal government, mother in healthcare). Gifted track athlete — individual sport, so addiction isolated him. Stress fracture at 17 — legitimate prescription — compliant patient — prescription ran out — 8 months of secret heroin use before anyone noticed. Embarrassment of someone who believed they were exempt. Should be finishing sophomore year of college.",
+      "relationships": "Megan (sponsor, 6 weeks — long enough for real attachment, short enough for false confidence). Family (father in municipal government, mother in healthcare — they did everything right; the system failed him anyway).",
+      "notes": "STEP WORK: Working step 4 moral inventory when the series begins. Writing every person he hurt, every resentment, every piece of wreckage — reading those pages to Megan. When he transitions, the audience knows what was on those pages. APARTMENT: Cleared-wall logic throughout. Faint marks on walls where things used to hang. ONE EXCEPTION: a participation medal on the windowsill — from a junior meet at 14, before he was fast enough to win anything. It is from before he had anything to lose. Camera finds it once in the pilot without comment. Again in Episode 4 during inventory intercuts. THE TEXTS: Episode 1 — 'How are you.' No question mark. Unknown number. Jordan reads it, stares, puts phone face down, keeps writing. Episodes 3-4 — second text: 'It was not accidental.' First text makes audience uneasy. Second makes them understand why the first was wrong all along."
+    },
+    {
+      "name": "Diane",
+      "role": "Sponsor — 19 years sober at time of relapse, now infected",
+      "arc": "Megan finds Diane in the parking lot. Administers Narcan. Diane is infected. In middle stages of transition through most of season 1. Everyone reads her deterioration as aftermath of relapse. The 72-hour reversal window closes long before anyone knows it exists. She cannot be saved. Megan will try anyway.",
+      "traits": "Late 50s. The infrastructure of the program — runs the Tuesday night meeting, has sponsored dozens of women. Warm. Steady. 19 years of lived wisdom.",
+      "relationships": "Megan (sponsee — Megan administers the Narcan, carries the guilt of infecting the person who saved her life). The program (she IS the program).",
+      "notes": "RELAPSE TRIGGER: At a meeting, a woman she has sponsored two years says she relapsed because she was finally genuinely happy for two weeks and did not know what to do with that. Diane drives home carrying her own two weeks like that — from thirty years ago, never told to anyone in 19 years of meetings. She kept one thing back. Reaches for her sponsor. He has been dead for three years. She forgot, for one moment, that he was gone. Puts the phone down. Does not call anyone else. That gap is where nineteen years ends. THE PARKING LOT (pilot final image): Two hidden beats inside the normalcy. Beat 1: Diane asks how much Narcan Megan used, how many doses, whether she has more — the virus orienting toward what activated it, masked as a post-revival question. Beat 2: Diane helps Megan up, hand on her arm, holds it a beat longer. First watch: sponsor reflex. Rewatch: she was taking inventory. Scene ends on warmth and quiet. Nothing visibly wrong. Everything already wrong."
+    },
+    {
+      "name": "Ray",
+      "role": "Partner — Career EMS, Mid-40s",
+      "arc": "Arc: forced to understand what Megan has been carrying. The moment Ray grasps her recovery and the guilt about the early Narcan calls is one of the quietest and most devastating scenes in the series. Season 2: instinct to protect his family by withdrawing creates the central interpersonal friction with Megan, who cannot stop showing up.",
+      "traits": "Mid-40s. Male. Career EMS. Has administered Narcan hundreds of times — at the start, this is a job. Not callous. Compartmentalized. Steady where Megan is raw. Has a family. Teenage kid.",
+      "relationships": "Megan (partner — becomes one of her primary supports without either designing it; shows up every shift and treats her like a competent professional when she does not believe she is one). Family (teenage kid — drives Season 2 withdrawal instinct).",
+      "notes": "FUNCTION: The non-recovery world intersecting with the crisis constantly without fully understanding it. His arc is being forced to understand it."
+    },
+    {
+      "name": "Dr. Caroline Marsh",
+      "role": "Villain — Former CDC Epidemiologist, architect of the virus",
+      "arc": "Called in as CDC consultant on post-revival death cluster (she wrote the 2019 paper — she was always going to be called). Season 1: operates as trusted ally, collects every revival name Megan gives her (already knows every name — mapping the exposure network). Reveal at end of Season 1 / early Season 2. The monster is not foreign. It came from the same place the indifference did.",
+      "traits": "Late 50s. Former CDC epidemiologist. Warm and disarming — the specific affect of someone who has delivered terrible news to many people and learned to do it gently. Self-deprecating. Visibly quietly sad in a way that reads as professional grief. The kind of person you trust immediately.",
+      "relationships": "Thomas (son, deceased — she administered Narcan, he came back, said something, died again before the second dose. What he said is never revealed). Megan (appears as ally; is mapping the exposure network using Megan data).",
+      "notes": "SON THOMAS: Carries a physical photograph — worn at edges. Appears in background of her first scene, not called attention to. What Thomas said before dying is never revealed. Referenced once obliquely in Season 2, scene cuts. Lives in the audience imagination. IDEOLOGY: Corrupted public health logic. Not wrong about the data. Catastrophically wrong about what it means. Does not hate addicts — hates the false promise of intervention. The virus weaponizes Narcan as its delivery mechanism. That is her signature. Her argument made biological. LINE TO BE RECONTEXTUALIZED: 'These things burn themselves out.' INTRODUCTION: Overheard phone call in hospital corridor — Megan and Ray catch fragments before she turns and introduces herself. The squeeze of Megan arm before she leaves: assessment, not solidarity."
+    }
+  ],
+  "world": [
+    {
+      "category": "Virus Mechanics",
+      "title": "Infection Overview",
+      "content": "PRIMARY VECTOR: Narcan/naloxone revival of a contaminated heroin supply.\nSECONDARY VECTOR: Contact transmission in final 48 hours pre-transition — shared needles, blood contact, the ordinary transmission routes of the opioid crisis. Produces slower, less complete transition. Secondary infected class: less organized, less intelligent, less purposeful. The hierarchy mirrors the crisis: primary infected are people the system touched and tried to save. Secondary infected are people the system never reached.\nThe infected are specifically drawn to naloxone/Narcan carriers — making harm reduction infrastructure the most dangerous places to be.\nREVERSAL WINDOW: Theoretically reversible within 72 hours of revival. Has never been successfully used. The knowledge lives in Caroline Marsh buried research. The race to find and use it is the emotional engine of Season 2."
+    },
+    {
+      "category": "Virus Mechanics",
+      "title": "Transition Timeline",
+      "content": "DAYS 1-3: Indistinguishable from standard post-OD recovery. Fatigue, nausea, shame. Attributed to the body resetting.\n\nDAYS 4-10: Restlessness that does not resolve. Unusual insomnia — not anxious, but still. Like the body is awake for a reason it is not sharing. Mild irritability. Reduced appetite. Mistaken for: standard withdrawal.\n\nDAYS 11-21: Behavior reads as craving behavior. Fixation. Attention that tracks movement in a room without appearing to. Questions about routine — where people go, when they will be back, what they carry. Manipulative in ways familiar to anyone who has loved an addict. Mistaken for: active using or imminent relapse.\n\nDAYS 22-35: Physical deterioration accelerating. Weight loss beyond explainable. Performs normalcy when observed. Completely still when not. Blink rate slows — four seconds between blinks instead of two. Voice flattens in register but not vocabulary. Grammatically correct. Affectively empty. Like someone reading aloud from a document they did not write. Mistaken for: relapse, withdrawal, active addiction.\n\nDAYS 35-42: Full transition. The performance ends. The body achieves a stillness objects have and living things do not. Then it moves — faster and more purposeful than a human body should — and the contrast between the stillness and the movement is where the horror lives.\n\nNO CLEAN TELL: The performance does not degrade — it accumulates. Each micro-behavior individually explainable. Only someone who has catalogued enough cases can read the pattern. In Season 1 nobody has that knowledge. By Season 2, Megan does."
+    },
+    {
+      "category": "Geography",
+      "title": "Setting — Season 1",
+      "content": "Rust belt city — Huntington, WV or fictional equivalent. Documented overdose capital. Visible public harm reduction infrastructure. The outbreak seeps before it floods.\nTHEMATIC FUNCTION: This city has been screaming for help for twenty years. The national response was largely indifference. When the horror begins, the country first instinct is to contain it and look away — which is exactly what they already did."
+    },
+    {
+      "category": "Geography",
+      "title": "Setting — Season 2",
+      "content": "Undeniably national. The country must confront it in the open. The moral question moves to center stage. The infected become almost secondary to the question of who gets to decide which lives are worth saving."
+    },
+    {
+      "category": "Themes",
+      "title": "Core Thematic Question",
+      "content": "Did we ever actually want to save these people?\n\nThe series does not answer this with a speech. It answers it with what the country does when it can no longer look away."
+    },
+    {
+      "category": "Themes",
+      "title": "The Double Meaning",
+      "content": "Every time Megan doubts whether she belongs in recovery — whether she is really an addict — the audience is watching someone unknowingly describe the infected.\n\nThe gap between correct information and full integration is what the series is about. Megan knows cross-addiction is real. She knows what the program says. The knowing is not enough.\n\nRecovery is presented not as a destination but as the ongoing fragile act of choosing to stay. The infected are people who no longer have that choice."
+    },
+    {
+      "category": "Themes",
+      "title": "Harm Reduction as Vector",
+      "content": "The infected are drawn to Narcan carriers. The places built to help addicts — harm reduction infrastructure, meeting rooms, rehab facilities — become the most dangerous places to be.\n\nThis is the virus signature and Caroline Marsh argument made biological: Narcan saves lives only to lose them again. She is not wrong about the data. She is catastrophically wrong about what it means."
+    },
+    {
+      "category": "Themes",
+      "title": "Systemic Indifference",
+      "content": "The opioid crisis produced the outbreak. The national indifference to the opioid crisis produced the conditions for it to spread. Season 1: a city that has been screaming for help for twenty years, met with the same response — contain it and look away. Season 2: the country must face the moral question it has been deferring.\n\nThe monster came from the same place the indifference did. Caroline Marsh is not foreign. She is institutional."
+    },
+    {
+      "category": "Visual Language",
+      "title": "Central Visual Motif",
+      "content": "Megan kneeling over someone.\n\nEstablished at her bottom (kneeling over the dying woman who asked 'you okay?'). Repeating through every Narcan call. Culminating in the parking lot with Diane. Accumulating meaning every time.\n\nThe audience registers this subconsciously at first. By the parking lot it lands with full weight."
+    },
+    {
+      "category": "Visual Language",
+      "title": "Jordan Apartment",
+      "content": "Cleared-wall logic throughout — stripped of the past. Faint marks on the walls where things used to hang. Objects that belong to the present only.\n\nONE EXCEPTION: a participation medal on the windowsill. Not from a win — from a junior meet at 14, before he was fast enough to win anything. The wrong medal to keep. He kept it because it predates the achievement, predates the injury, predates everything. It is from before he had anything to lose.\n\nCamera finds it once in the pilot without comment. Again in Episode 4 during the inventory intercuts."
+    },
+    {
+      "category": "Visual Language",
+      "title": "Third Step Prayer — Megan Recitation",
+      "content": "'God, I offer myself to Thee—' Clear. The offering costs nothing yet.\n'to build with me and to do with me as Thou wilt.' Lost. Knows the rhythm, not all the words.\n'Relieve me of the bondage of self,' MOST LOST. The precise clinical description of everything wrong with her recovery. Camera finds her face here.\n'that I may better do Thy will.' Mumbled.\n'Take away my difficulties,' Found again. Sounds like asking for relief rather than dissolution of self.\n'that victory over them may bear witness to those I would help' Steady and confident. Her service work identity. The most dishonest moment in the prayer.\n'of Thy Power, Thy Love, and Thy Way of life.' Holds this.\n'May I do Thy will always!' Flat completion. No exclamation in the delivery. She drops the hands immediately."
+    },
+    {
+      "category": "Format & Industry",
+      "title": "Series Structure",
+      "content": "Limited series. 2 seasons. 8 episodes each. 16 episodes total. Hard stop.\n\nSEASON 1 — Discovery and Collapse: The outbreak spreads. Systems built to help addicts become vectors. Nobody understands what they are dealing with. Caroline Marsh operates as trusted ally. Episode titles are recovery slogans turning inside out. Ends with discovery of deliberate origin and Megan understanding what she has done to Diane.\n\nSEASON 2 — Reckoning and Resolution: Truth is public. National scale. The 72-hour reversal window discovered. Caroline Marsh full history revealed. The moral question about harm reduction cannot be avoided. Ends with Megan arc resolved — guilt faced, identity clarified, choice made — and the world future deliberately ambiguous.\n\nTARGET PLATFORMS: Netflix primary. Max secondary."
+    },
+    {
+      "category": "Format & Industry",
+      "title": "Season 1 Episode Titles",
+      "content": "Episode 1: First Things First — The first tradition of NA. Megan orientation episode. The pilot. Also the virus first things: first revival, first infection, first orientation toward the host.\n\nEpisode 2: One Day at a Time — Diane episode — her relapse, the parking lot, the revival. The infected changing one day at a time, invisibly.\n\nEpisode 3: Keep Coming Back — The infected begin returning to places and people with a logic nobody understands yet.\n\nEpisode 4: The Searching and Fearless — From step 4. Jordan deep in his inventory, deep in his transition. His written confessions intercut with what he is becoming.\n\nEpisode 5: Came to Believe — Megan begins to believe something is wrong with Diane, with Jordan. Caroline Marsh begins to understand the outbreak exceeds her models.\n\nEpisode 6: Let Go and Let — The full phrase is let go and let God. The episode cuts the sentence off. Megan cannot let go.\n\nEpisode 7: How It Works — The virus mechanism first partially understood. Megan realizes what she did to Diane.\n\nEpisode 8: Keep Only What You Need — Season finale. The 72-hour window discovered. Too late for Diane. Possibly not for Jordan. Caroline Marsh now a known quantity. The outbreak goes national."
+    },
+    {
+      "category": "Recovery Authenticity",
+      "title": "NA Language and Authenticity Flags",
+      "content": "NOTE: The writer is in recovery. Their instincts about recovery authenticity are authoritative. When they correct something about the program, meetings, or addiction psychology — they are right.\n\nCONFIRMED LANGUAGE IN USE:\n- Restless, irritable, and discontent\n- Hi I am [name] I am an addict (NA, not AA)\n- Keep coming back\n- Third Step Prayer (full text in pilot)\n- Step 4 searching and fearless moral inventory\n- One day at a time\n- First things first\n- Commitment into a rehab\n- Home group vs. unfamiliar meeting\n- Sponsor/sponsee relationship norms\n\nAUTHENTICITY FLAGS TO REVIEW BEFORE DIALOGUE DRAFT:\n- Exact phrasing of how shares open and close in NA\n- Whether conceded to my innermost self reads as written or as standard NA\n- Cross-addiction conversation norms in the rooms\n- Sponsor/sponsee timeline norms (is 6 weeks too early?)\n- How meetings handle relapse announcements"
+    }
+  ],
+  "research": [
+    {
+      "title": "Pilot Scene Breakdown — Episode 1: First Things First",
+      "source_type": "note",
+      "summary": "Complete pilot scene breakdown: 5 scenes — meeting/share/prayer/car, Narcan call (eyes wrong), routine call (baseline), Jordan alone with inventory and the text, parking lot with Diane.",
+      "tags": "pilot,episode 1,scene breakdown",
+      "original_content": "SCENE 1 — THE MEETING: NA meeting, not Megan home group. She arrives during Serenity Prayer, slips into corner chair against the wall. Her share: Hi I am Megan I am an addict. Had a day. Restless, irritable, discontent. Credentials. Has a sponsee — probably should not have taken one on yet, but. He is a good kid. A kid at the rehab asked how he knew he was getting better. She told him: you keep showing up. Question sits in the room through episode 8. Concession: loses eye contact when she says it. Alcohol section: makes eye contact with the old timer who will not return it — performance of courage using a prop that cannot challenge it. THIRD STEP PRAYER: line by line breakdown in Visual Language notes. IN THE CAR: engine off, not crying. Radio crackles. Possible OD. Hand finds the key before she decides to.\n\nSCENE 2 — NARCAN CALL (midpoint): Standard OD. Narcan goes in. Patient revives. The eyes are wrong for one beat too long. Then it passes. She files it.\n\nSCENE 3 — ROUTINE CALL: Normal revival. No face — just hands, slack then gripping. Ray already on the radio before the hands fully grip. Megan watches the hands. The contrast is the whole scene. Audience now has a baseline.\n\nSCENE 4 — JORDAN APARTMENT: Cleared walls. Participation medal. Legal pad. Step 4, line after line. Phone buzzes. He stares. Face down. Keeps writing.\n\nSCENE 5 — THE PARKING LOT (final image): Diane on the asphalt. Megan kneeling over her. Narcan goes in. Beat 1: Diane asks how much Narcan, how many doses, whether she has more. Beat 2: Diane helps Megan up, hand on arm, holds one beat too long. First watch: sponsor reflex. Rewatch: assessment. Scene ends on warmth and quiet. Nothing visibly wrong. Everything already wrong."
+    },
+    {
+      "title": "THREE OPEN QUESTIONS — Resolve Before Writing Begins",
+      "source_type": "note",
+      "summary": "Three pre-draft questions to resolve in the first writing session.",
+      "tags": "pre-draft,questions,pilot",
+      "original_content": "1. PILOT DRAFT FORMAT: Proper screenplay format from the start, OR detailed prose breakdown first?\n\n2. NA-SPECIFIC LANGUAGE: Any language to flag for authenticity review before dialogue draft? (Writer is in recovery — their corrections are authoritative.)\n\n3. EPISODE 1 TITLE: First Things First — confirmed or adjusted?\n\nDO NOT begin drafting until these are resolved."
+    },
+    {
+      "title": "Tonal Reference — Flanagan / Netflix Register",
+      "source_type": "note",
+      "summary": "Tonal target — Flanagan Netflix register. Horror as consequence of character. Emotionally resolving without literal resolution.",
+      "tags": "tone,comparable,flanagan,netflix",
+      "original_content": "Target: Mike Flanagan Netflix work — The Haunting of Hill House, Midnight Mass, Bly Manor.\n\nKey elements:\n- Horror arrives as a consequence of who people already are\n- The monster is a metaphor made literal\n- Emotionally resolving without literal resolution\n- Human and systemic — horror inseparable from grief\n- Long, unhurried character scenes that do double work\n- Rewatch scenes unambiguous the second time\n\nTHE PITCH: This is the next chapter of what Flanagan built at Netflix, written by someone who lived the crisis he could only research."
+    }
+  ],
+  "beats": [
+    { "position": 1,  "label": "Opening Image",    "description": "Megan arriving at the meeting late, slipping into the corner chair against the wall. Mouth picking up the Serenity Prayer mechanically. Eyes somewhere else." },
+    { "position": 2,  "label": "Setup",             "description": "The meeting. Her share — credentials, the concession, the alcoholism she has not accepted. The Third Step Prayer, line by line. What she says vs. what she means." },
+    { "position": 3,  "label": "Theme Stated",      "description": "A kid at the rehab asked how he knew he was getting better. She told him: you know because you keep showing up. The question sits in the room. It will still be sitting there in episode 8." },
+    { "position": 4,  "label": "Catalyst",          "description": "In the car, engine off, not crying. The radio crackles. A dispatcher voice. Possible OD. Her hand finds the key before she decides to." },
+    { "position": 5,  "label": "Debate",            "description": "She pulls out. Camera stays on the empty space where she was. The light in the meeting windows. The shape of her absence." },
+    { "position": 6,  "label": "Break into Two",    "description": "SCENE 2 — The Narcan call. Standard revival. But: the eyes are wrong for one beat too long. She files it. She has enough going on." },
+    { "position": 7,  "label": "B Story",           "description": "SCENE 3 — The routine call. Normal revival. No face — just hands, slack then gripping. Ray already on the radio. Megan watches. The contrast is the whole scene." },
+    { "position": 8,  "label": "Fun and Games",     "description": "SCENE 4 — Jordan alone. Cleared apartment. Participation medal. Step 4 on the legal pad. The phone buzzing. He stares. Face down. Keeps writing." },
+    { "position": 9,  "label": "Midpoint",          "description": "The phone. We do not see what it says. The inventory continues under a question that has no question in it." },
+    { "position": 10, "label": "All Is Lost",       "description": "SCENE 5 — The parking lot. Diane on the asphalt. Megan kneeling over her — the motif repeating. The Narcan going in." },
+    { "position": 11, "label": "Final Image",       "description": "Diane asks how much Narcan, how many doses, whether she has more. Helps Megan up. Hand on her arm. Holds it one beat too long. Warmth and quiet. Nothing visibly wrong. Everything already wrong." }
+  ]
+}
