@@ -23,6 +23,7 @@ export default function ChatPanel() {
   const inputRef   = useRef()
   const renameRef  = useRef()
   const activeStreamRef = useRef(null)
+  const currentRequestIdRef = useRef(null)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -32,11 +33,17 @@ export default function ChatPanel() {
   // that this ChatPanel launched. This prevents another chat tab/session from
   // visually overwriting the currently selected chat while a response streams.
   useEffect(() => {
-    const cleanup = window.api.onMenu('claude:stream-chunk', ({ projectId, chatSessionId, chunk }) => {
+    const cleanup = window.api.onMenu('claude:stream-chunk', ({ projectId, chatSessionId, requestId, chunk }) => {
       const active = activeStreamRef.current
       if (!active) return
       if (projectId !== active.projectId) return
       if (chatSessionId !== active.chatSessionId) return
+      if (requestId && active.requestId && requestId !== active.requestId) return
+
+      const state = useStore.getState()
+      if (state.currentProject?.id !== active.projectId) return
+      if (state.currentChatSessionId !== active.chatSessionId) return
+
       setStreaming(s => s + chunk)
     })
     return cleanup
@@ -128,13 +135,16 @@ export default function ChatPanel() {
     const message = input.trim()
     const sendProjectId = currentProject.id
     const sendSessionId = currentChatSessionId
+    const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`
 
     setInput('')
     setLoading(true)
     setStreaming('')
+    currentRequestIdRef.current = requestId
     activeStreamRef.current = {
       projectId: sendProjectId,
-      chatSessionId: sendSessionId
+      chatSessionId: sendSessionId,
+      requestId
     }
 
     const context = currentDocument?.content?.slice(-500) || ''
@@ -145,7 +155,8 @@ export default function ChatPanel() {
         message,
         chatHistory:     chatHistory.slice(-10),
         documentContext: context,
-        chatSessionId:   sendSessionId
+        chatSessionId:   sendSessionId,
+        requestId
       })
 
       // Only replace the visible history if the user is still looking at the
@@ -158,8 +169,24 @@ export default function ChatPanel() {
       addNotification('Chat error: ' + err.message, 'error')
     }
     activeStreamRef.current = null
+    currentRequestIdRef.current = null
     setStreaming('')
     setLoading(false)
+  }
+
+  async function handleStopGeneration() {
+    const active = activeStreamRef.current
+    if (!active || !loading) return
+
+    const state = useStore.getState()
+    if (state.currentProject?.id !== active.projectId) return
+    if (state.currentChatSessionId !== active.chatSessionId) return
+
+    try {
+      await window.api.claudeCancelChat(active)
+    } catch (err) {
+      addNotification('Could not stop chat: ' + err.message, 'error')
+    }
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -170,6 +197,11 @@ export default function ChatPanel() {
   ]
 
   const noSession = !currentChatSessionId
+  const activeStream = activeStreamRef.current
+  const canStopVisibleStream = loading &&
+    activeStream &&
+    activeStream.projectId === currentProject?.id &&
+    activeStream.chatSessionId === currentChatSessionId
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg-panel)' }}>
@@ -285,7 +317,12 @@ export default function ChatPanel() {
         justifyContent: 'space-between',
         alignItems: 'center'
       }}>
-        <div style={{ fontFamily: 'var(--font-display)', fontSize: 15, color: 'var(--amber)' }}>Claude Chat</div>
+        <div>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 15, color: 'var(--amber)' }}>Claude Chat</div>
+          <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 3, lineHeight: 1.4 }}>
+            After stopping: “Continue exactly where you left off before I stopped generation. Do not restart, summarize, or repeat prior text.”
+          </div>
+        </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>Sonnet</span>
           <button
@@ -359,14 +396,27 @@ export default function ChatPanel() {
               if (e.key === 'Enter' && !e.shiftKey) handleSend(e)
             }}
           />
-          <button
-            className="btn btn-primary"
-            type="submit"
-            disabled={loading || !input.trim() || noSession}
-            style={{ alignSelf: 'flex-end', opacity: loading || !input.trim() || noSession ? 0.5 : 1 }}
-          >
-            {loading ? '…' : '→'}
-          </button>
+          {canStopVisibleStream ? (
+            <button
+              className="btn btn-ghost"
+              type="button"
+              onClick={handleStopGeneration}
+              style={{ alignSelf: 'flex-end', fontSize: 12, color: 'var(--text-primary)' }}
+              title="Stop this chat generation"
+            >
+              Stop
+            </button>
+          ) : (
+            <button
+              className="btn btn-primary"
+              type="submit"
+              disabled={loading || !input.trim() || noSession}
+              style={{ alignSelf: 'flex-end', opacity: loading || !input.trim() || noSession ? 0.5 : 1 }}
+              title={loading ? 'Another chat is currently generating' : 'Send'}
+            >
+              {loading ? '…' : '→'}
+            </button>
+          )}
         </form>
         <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4 }}>
           Shift+Enter for new line • Double-click tab to rename

@@ -190,6 +190,7 @@ ipcMain.handle('tokens:get-usage', (e, projectId) => db.getTokenUsage(projectId)
 // Claude
 ipcMain.handle('claude:validate-key', claude.handleValidateApiKey)
 ipcMain.handle('claude:chat', claude.handleChat)
+ipcMain.handle('claude:cancel-chat', claude.handleCancelChat)
 ipcMain.handle('claude:inline-suggest', claude.handleInlineSuggestion)
 ipcMain.handle('claude:full-rewrite', claude.handleFullRewrite)
 ipcMain.handle('claude:tone-adjust', claude.handleToneAdjust)

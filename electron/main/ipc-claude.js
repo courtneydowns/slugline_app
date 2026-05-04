@@ -8,6 +8,35 @@ const { CLAUDE_MODELS, selectClaudeModel, selectMaxTokens } = require('./claude-
 const CONTINUATION_PROMPT   = 'Continue exactly where you left off. Do not repeat prior text.'
 const MAX_CONTINUATION_PASSES = 2
 
+// Active chat streams keyed by project/session/request so the renderer can stop
+// one running chat without affecting another chat tab.
+const activeChatRequests = new Map()
+
+function chatRequestKey(projectId, chatSessionId, requestId) {
+  return `${projectId || 'no-project'}:${chatSessionId || 'no-session'}:${requestId || 'no-request'}`
+}
+
+function handleCancelChat(event, { projectId, chatSessionId, requestId }) {
+  const key = chatRequestKey(projectId, chatSessionId || null, requestId)
+  const active = activeChatRequests.get(key)
+
+  if (!active) return { cancelled: false }
+
+  active.cancelled = true
+
+  try {
+    if (active.stream && typeof active.stream.abort === 'function') {
+      active.stream.abort()
+    } else if (active.stream?.controller && typeof active.stream.controller.abort === 'function') {
+      active.stream.controller.abort()
+    }
+  } catch (err) {
+    // The stream may already be closing; cancellation should remain best-effort.
+  }
+
+  return { cancelled: true }
+}
+
 function getClient() {
   const key = getApiKey()
   if (!key) throw new Error('No API key configured. Go to Settings to add your Anthropic API key.')
@@ -87,9 +116,12 @@ async function handleValidateApiKey(event, { apiKey }) {
   }
 }
 
-async function handleChat(event, { projectId, message, chatHistory, documentContext, chatSessionId }) {
+async function handleChat(event, { projectId, message, chatHistory, documentContext, chatSessionId, requestId }) {
   const model  = selectClaudeModel('chat')
   const client = getClient()
+  const requestKey = chatRequestKey(projectId, chatSessionId || null, requestId)
+  const activeRequest = { cancelled: false, stream: null }
+  activeChatRequests.set(requestKey, activeRequest)
 
   const project = db.getProject(projectId)
 
@@ -124,6 +156,8 @@ async function handleChat(event, { projectId, message, chatHistory, documentCont
 
   // ── Streaming pass — with automatic continuation on max_tokens ────────────
   async function streamPass(passMessages, passNumber) {
+    if (activeRequest.cancelled) return
+
     const stream = client.messages.stream({
       model,
       max_tokens: selectMaxTokens('chat'),
@@ -131,11 +165,15 @@ async function handleChat(event, { projectId, message, chatHistory, documentCont
       messages: passMessages
     })
 
+    activeRequest.stream = stream
+
     stream.on('text', (text) => {
+      if (activeRequest.cancelled) return
       fullContent += text
       event.sender.send('claude:stream-chunk', {
         projectId,
         chatSessionId: chatSessionId || null,
+        requestId: requestId || null,
         chunk: text
       })
     })
@@ -147,11 +185,14 @@ async function handleChat(event, { projectId, message, chatHistory, documentCont
     totalInput  += usage.input_tokens  || 0
     totalOutput += usage.output_tokens || 0
 
+    if (activeRequest.cancelled) return
+
     if (stopReason === 'max_tokens' && passNumber < MAX_CONTINUATION_PASSES) {
       // Notify the renderer a continuation is starting
       event.sender.send('claude:stream-chunk', {
         projectId,
         chatSessionId: chatSessionId || null,
+        requestId: requestId || null,
         chunk: '\n\n[Response reached output limit — continuing…]\n\n'
       })
 
@@ -168,6 +209,7 @@ async function handleChat(event, { projectId, message, chatHistory, documentCont
       event.sender.send('claude:stream-chunk', {
         projectId,
         chatSessionId: chatSessionId || null,
+        requestId: requestId || null,
         chunk: '\n\n[Automatic continuation limit reached. Send “continue” and I’ll pick up exactly where I left off.]\n\n'
       })
     }
@@ -177,15 +219,53 @@ async function handleChat(event, { projectId, message, chatHistory, documentCont
   try {
     await streamPass(messages, 0)
 
+    if (activeRequest.cancelled) {
+      const cancelledContent = fullContent
+        ? `${fullContent}\n\n[Generation stopped by user.]`
+        : '[Generation stopped by user.]'
+
+      db.addChatMessage({ project_id: projectId, role: 'assistant', content: cancelledContent, model, tokens_used: totalOutput, context: 'chat', chat_session_id: chatSessionId || null })
+      db.logTokenUsage({ project_id: projectId, model, feature: 'chat', input_tokens: totalInput, output_tokens: totalOutput })
+
+      event.sender.send('claude:stream-chunk', {
+        projectId,
+        chatSessionId: chatSessionId || null,
+        requestId: requestId || null,
+        chunk: fullContent ? '\n\n[Generation stopped by user.]' : '[Generation stopped by user.]'
+      })
+
+      return { content: cancelledContent, model, cancelled: true, usage: { input_tokens: totalInput, output_tokens: totalOutput } }
+    }
+
     db.addChatMessage({ project_id: projectId, role: 'assistant', content: fullContent, model, tokens_used: totalOutput, context: 'chat', chat_session_id: chatSessionId || null })
     db.logTokenUsage({ project_id: projectId, model, feature: 'chat', input_tokens: totalInput, output_tokens: totalOutput })
 
     return { content: fullContent, model, usage: { input_tokens: totalInput, output_tokens: totalOutput } }
   } catch (err) {
+    if (activeRequest.cancelled) {
+      const cancelledContent = fullContent
+        ? `${fullContent}\n\n[Generation stopped by user.]`
+        : '[Generation stopped by user.]'
+
+      db.addChatMessage({ project_id: projectId, role: 'assistant', content: cancelledContent, model, tokens_used: totalOutput, context: 'chat', chat_session_id: chatSessionId || null })
+      db.logTokenUsage({ project_id: projectId, model, feature: 'chat', input_tokens: totalInput, output_tokens: totalOutput })
+
+      event.sender.send('claude:stream-chunk', {
+        projectId,
+        chatSessionId: chatSessionId || null,
+        requestId: requestId || null,
+        chunk: fullContent ? '\n\n[Generation stopped by user.]' : '[Generation stopped by user.]'
+      })
+
+      return { content: cancelledContent, model, cancelled: true, usage: { input_tokens: totalInput, output_tokens: totalOutput } }
+    }
+
     if (fullContent) {
       db.addChatMessage({ project_id: projectId, role: 'assistant', content: fullContent, model, context: 'chat', chat_session_id: chatSessionId || null })
     }
     throw err
+  } finally {
+    activeChatRequests.delete(requestKey)
   }
 }
 
@@ -326,7 +406,7 @@ async function handleEstimateTokens(event, { text }) {
 }
 
 module.exports = {
-  handleValidateApiKey, handleChat, handleInlineSuggestion, handleFullRewrite,
+  handleValidateApiKey, handleChat, handleCancelChat, handleInlineSuggestion, handleFullRewrite,
   handleToneAdjust, handleSceneAnalysis, handleDialogueCoach, handleDevelopmentQuestion,
   handleGenerateStoryBible, handleLoglineAssist, handleResearchIngest, handleAutoTag,
   handleWritingPrompt, handleTvVsFeature, handleBeatSheetAnalysis, handleEstimateTokens
