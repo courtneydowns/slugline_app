@@ -96,7 +96,7 @@ export default function StatusBar({ onPanic }) {
       <div style={{ flex: 1 }} />
 
       {/* Shortcuts hint */}
-      <span style={{ opacity: 0.5 }}>Tab: change type • Enter: new block • ⌘⇧P: panic export</span>
+      <span style={{ opacity: 0.75, color: 'var(--text-muted)' }}>Tab: change type • Enter: new block • ⌘⇧P: panic export</span>
     </div>
   )
 }

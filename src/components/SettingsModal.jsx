@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import useStore from '../store'
 
 export default function SettingsModal({ onClose }) {
-  const { preferences, setPreferences, addNotification } = useStore()
+  const { preferences, setPreferences, setTheme, addNotification } = useStore()
   const [form, setForm] = useState({
     theme: preferences.theme || 'dark',
     pageGoal: preferences.pageGoal || 5,
@@ -88,7 +88,13 @@ export default function SettingsModal({ onClose }) {
               <Field label="Theme">
                 <div style={{ display: 'flex', gap: 8 }}>
                   {['dark', 'light'].map(t => (
-                    <button key={t} onClick={() => setForm(f => ({ ...f, theme: t }))} className="btn btn-ghost btn-sm"
+                    <button
+                      key={t}
+                      onClick={() => {
+                        setForm(f => ({ ...f, theme: t }))
+                        setTheme(t)
+                      }}
+                      className="btn btn-ghost btn-sm"
                       style={{ opacity: form.theme === t ? 1 : 0.5, borderColor: form.theme === t ? 'var(--amber)' : 'var(--border)', color: form.theme === t ? 'var(--amber)' : 'var(--text-secondary)' }}>
                       {t === 'dark' ? '🌙 Dark' : '☀️ Light'}
                     </button>

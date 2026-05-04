@@ -16,8 +16,8 @@
   --border-subtle: #1E1E28;
 
   --text-primary: #E8E6E3;
-  --text-secondary: #9B9AA0;
-  --text-muted: #5A5960;
+  --text-secondary: #BBB7C2;
+  --text-muted: #9C97A3;
   --text-inverse: #0D0D0F;
 
   --amber: #C8963E;
@@ -50,8 +50,8 @@
   --border-subtle: #E5E3DC;
 
   --text-primary: #1A1918;
-  --text-secondary: #5A5750;
-  --text-muted: #9A9890;
+  --text-secondary: #4C4841;
+  --text-muted: #5B564E;
   --text-inverse: #F5F4F0;
 
   --amber: #B07A28;
@@ -883,7 +883,7 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
 
 .dashboard-stat-label {
   font-size: 11px;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   margin-top: 4px;
@@ -925,7 +925,7 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   margin-bottom: 16px;
 }
 
@@ -971,7 +971,7 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
 
 .workspace-card-desc {
   font-size: 11px;
-  color: var(--text-muted);
+  color: var(--text-secondary);
 }
 
 /* ─── Dashboard Suggestions ─────────────────────────────────────────────────── */
