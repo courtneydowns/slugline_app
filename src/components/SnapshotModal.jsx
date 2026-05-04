@@ -13,6 +13,14 @@ export default function SnapshotModal({ onClose }) {
     load()
   }, [])
 
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onClose])
+
   async function load() {
     const s = await window.api.getSnapshots(currentProject.id)
     setSnapshots(s)
@@ -46,8 +54,8 @@ export default function SnapshotModal({ onClose }) {
   const typeColors = { manual: 'var(--amber)', daily: 'var(--blue)', panic: 'var(--red)' }
 
   return (
-    <div className="modal-overlay">
-      <div className="modal" style={{ width: 560, maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
+    <div className="modal-overlay" onMouseDown={onClose}>
+      <div className="modal" style={{ width: 560, maxHeight: '80vh', display: 'flex', flexDirection: 'column' }} onMouseDown={e => e.stopPropagation()}>
         <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
           <div style={{ fontFamily: 'var(--font-display)', fontSize: 18, color: 'var(--amber)' }}>Snapshots</div>
           <div style={{ display: 'flex', gap: 10 }}>
