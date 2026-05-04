@@ -10,7 +10,7 @@ const ACT_COLORS = {
   act3: 'var(--green)', teaser: 'var(--text-muted)', tag: 'var(--text-muted)'
 }
 
-export default function BeatSheet({ onClose }) {
+export default function BeatSheet({ onClose, embedded }) {
   const { currentProject, beats, setBeats, currentDocument, addNotification } = useStore()
   const [loading, setLoading] = useState(false)
   const [analysing, setAnalysing] = useState(false)
@@ -59,9 +59,12 @@ export default function BeatSheet({ onClose }) {
 
   const pageCount = currentDocument?.page_count || 0
 
-  return (
-    <div className="modal-overlay">
-      <div className="modal" style={{ width: '90vw', maxWidth: 1100, maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+  const inner = (
+    <div style={embedded
+      ? { display: 'flex', flexDirection: 'column', height: '100%' }
+      : { width: '90vw', maxWidth: 1100, maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}
+      className={embedded ? '' : 'modal'}
+    >
         {/* Header */}
         <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
           <div>
@@ -190,6 +193,12 @@ export default function BeatSheet({ onClose }) {
           </div>
         )}
       </div>
+  )
+
+  if (embedded) return inner
+  return (
+    <div className="modal-overlay">
+      {inner}
     </div>
   )
 }

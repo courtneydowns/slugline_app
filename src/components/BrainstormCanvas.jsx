@@ -7,7 +7,7 @@ const CAT_COLORS = {
   dialogue: '#B07AC8', theme: '#C8963E', question: 'var(--red)', research: 'var(--text-secondary)'
 }
 
-export default function BrainstormCanvas({ onClose }) {
+export default function BrainstormCanvas({ onClose, embedded, ...props }) {
   const { currentProject, brainstorm, setBrainstorm, addNotification } = useStore()
   const [entries, setEntries] = useState(brainstorm || [])
   const [newText, setNewText] = useState('')
@@ -68,9 +68,12 @@ export default function BrainstormCanvas({ onClose }) {
   const visible = filter === 'all' ? entries : entries.filter(e => e.category === filter)
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'var(--bg-base)', zIndex: 50, display: 'flex', flexDirection: 'column' }}>
+    <div style={embedded
+      ? { display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg-base)' }
+      : { position: 'fixed', inset: 0, background: 'var(--bg-base)', zIndex: 50, display: 'flex', flexDirection: 'column' }
+    }>
       {/* Header */}
-      <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: 16, paddingTop: 48 }}>
+      <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: 16, paddingTop: embedded ? 20 : 48 }}>
         <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, color: 'var(--amber)' }}>Brainstorm Canvas</div>
         <div style={{ display: 'flex', gap: 6, flex: 1, flexWrap: 'wrap' }}>
           <button onClick={() => setFilter('all')} className="btn btn-ghost btn-sm" style={{ opacity: filter === 'all' ? 1 : 0.5 }}>All</button>

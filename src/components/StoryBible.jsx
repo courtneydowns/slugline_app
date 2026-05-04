@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import useStore from '../store'
 
-export default function StoryBible() {
+export default function StoryBible({ embedded }) {
   const [activeTab, setActiveTab] = useState('characters')
   const { currentProject, characters, worldBuilding, research, setCharacters, setWorldBuilding, setResearch } = useStore()
 
@@ -20,7 +20,7 @@ export default function StoryBible() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg-panel)' }}>
-      <div style={{ padding: '16px 16px 0', paddingTop: 48, borderBottom: '1px solid var(--border-subtle)' }}>
+      <div style={{ padding: '16px 16px 0', paddingTop: embedded ? 16 : 48, borderBottom: '1px solid var(--border-subtle)' }}>
         <div style={{ fontFamily: 'var(--font-display)', fontSize: 15, color: 'var(--amber)', marginBottom: 12 }}>Story Bible</div>
         <div style={{ display: 'flex', gap: 4 }}>
           {tabs.map(t => (

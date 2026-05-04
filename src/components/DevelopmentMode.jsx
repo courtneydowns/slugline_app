@@ -14,7 +14,7 @@ const QUESTIONS = [
   { id: 'tone', label: "What's the tone? What films or shows feel like what you're aiming for?", placeholder: "e.g. 'Dark comedy like Fargo, but with the heart of Little Miss Sunshine.' Comparables help." }
 ]
 
-export default function DevelopmentMode({ onClose }) {
+export default function DevelopmentMode({ onClose, embedded }) {
   const { currentProject, addNotification } = useStore()
   const [step, setStep] = useState('intro') // 'intro' | 'format' | 'questions' | 'logline' | 'complete'
   const [formatAnalysis, setFormatAnalysis] = useState(null)
@@ -83,7 +83,7 @@ export default function DevelopmentMode({ onClose }) {
 
   // ─── Intro ─────────────────────────────────────────────────────────────────
   if (step === 'intro') return (
-    <Screen title="Development Mode" onClose={onClose}>
+    <Screen title="Development Mode" onClose={onClose} embedded={embedded}>
       <div style={{ maxWidth: 600, margin: '0 auto', textAlign: 'center', padding: '48px 24px' }}>
         <div style={{ fontSize: 48, marginBottom: 24 }}>🎬</div>
         <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 28, color: 'var(--text-primary)', marginBottom: 16 }}>
@@ -112,7 +112,7 @@ export default function DevelopmentMode({ onClose }) {
 
   // ─── Questions ─────────────────────────────────────────────────────────────
   if (step === 'questions') return (
-    <Screen title="Development Mode" onClose={onClose}>
+    <Screen title="Development Mode" onClose={onClose} embedded={embedded}>
       <div style={{ maxWidth: 700, margin: '0 auto', padding: '40px 24px' }}>
         {/* Progress */}
         <div style={{ marginBottom: 32 }}>
@@ -189,7 +189,7 @@ export default function DevelopmentMode({ onClose }) {
 
   // ─── Format ────────────────────────────────────────────────────────────────
   if (step === 'format') return (
-    <Screen title="Development Mode" onClose={onClose}>
+    <Screen title="Development Mode" onClose={onClose} embedded={embedded}>
       <div style={{ maxWidth: 700, margin: '0 auto', padding: '40px 24px' }}>
         <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 24, marginBottom: 8 }}>Feature or TV?</h3>
         <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginBottom: 24 }}>
@@ -247,7 +247,7 @@ export default function DevelopmentMode({ onClose }) {
 
   // ─── Logline ───────────────────────────────────────────────────────────────
   if (step === 'logline') return (
-    <Screen title="Development Mode" onClose={onClose}>
+    <Screen title="Development Mode" onClose={onClose} embedded={embedded}>
       <div style={{ maxWidth: 700, margin: '0 auto', padding: '40px 24px' }}>
         <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 24, marginBottom: 8 }}>Your Logline</h3>
         <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginBottom: 24, lineHeight: 1.6 }}>
@@ -302,10 +302,13 @@ export default function DevelopmentMode({ onClose }) {
   return null
 }
 
-function Screen({ title, onClose, children }) {
+function Screen({ title, onClose, children, embedded }) {
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'var(--bg-base)', zIndex: 50, display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
-      <div style={{ position: 'absolute', top: 16, right: 20, zIndex: 10 }}>
+    <div style={embedded
+      ? { display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg-base)', overflow: 'auto' }
+      : { position: 'fixed', inset: 0, background: 'var(--bg-base)', zIndex: 50, display: 'flex', flexDirection: 'column', overflow: 'auto' }
+    }>
+      <div style={{ position: embedded ? 'sticky' : 'absolute', top: 16, right: 20, zIndex: 10, display: 'flex', justifyContent: 'flex-end', padding: embedded ? '16px 20px 0' : 0 }}>
         <button className="btn btn-ghost btn-sm" onClick={onClose}>✕ Close</button>
       </div>
       {children}

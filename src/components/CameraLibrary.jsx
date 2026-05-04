@@ -47,7 +47,7 @@ const CAMERA_TERMS = [
 
 const CATEGORIES = ['All', ...new Set(CAMERA_TERMS.map(t => t.category))]
 
-export default function CameraLibrary({ onClose }) {
+export default function CameraLibrary({ onClose, embedded }) {
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('All')
   const [copied, setCopied] = useState(null)
@@ -67,6 +67,35 @@ export default function CameraLibrary({ onClose }) {
     setCopied(text)
     setTimeout(() => setCopied(null), 1500)
   }
+
+  if (embedded) return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg-panel)' }}>
+      <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 18, color: 'var(--amber)' }}>Camera Direction Library</div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>Click any term to copy it to clipboard</div>
+        </div>
+        <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
+          <input className="input selectable" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search terms…" style={{ flex: 1 }} />
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {CATEGORIES.map(c => (
+            <button key={c} onClick={() => setCategory(c)} className="btn btn-ghost btn-sm" style={{ opacity: category === c ? 1 : 0.6 }}>{c}</button>
+          ))}
+        </div>
+      </div>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px' }}>
+        {filtered.map(term => (
+          <div key={term.term} onClick={() => copy(term.term)}
+            style={{ padding: '10px 14px', borderRadius: 6, marginBottom: 6, cursor: 'pointer', background: copied === term.term ? 'var(--amber-subtle)' : 'var(--bg-raised)', border: '1px solid var(--border-subtle)' }}>
+            <div style={{ fontWeight: 600, fontSize: 13, color: copied === term.term ? 'var(--amber)' : 'var(--text-primary)' }}>{copied === term.term ? '✓ Copied!' : term.term}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{term.desc}</div>
+          </div>
+        ))}
+        {filtered.length === 0 && <div style={{ textAlign: 'center', padding: 48, color: 'var(--text-muted)' }}>No terms found</div>}
+      </div>
+    </div>
+  )
 
   return (
     <div className="modal-overlay">

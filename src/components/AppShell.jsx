@@ -1,6 +1,8 @@
 import React, { useEffect } from 'react'
 import useStore from '../store'
-import Sidebar from './Sidebar'
+import TopBar from './TopBar'
+import NavRail from './NavRail'
+import Dashboard from './Dashboard'
 import ScreenplayEditor from './ScreenplayEditor'
 import ChatPanel from './ChatPanel'
 import StoryBible from './StoryBible'
@@ -19,28 +21,28 @@ import TokenPreview from './TokenPreview'
 
 export default function AppShell() {
   const {
+    activeWorkspace, setActiveWorkspace,
     showChat, showBible, layoutMode, setLayoutMode,
-    showBrainstorm, showDevelopment, showBeatSheet,
     showAnalysis, showDialogueCoach, showExport, showSettings,
-    showSnapshots, showCameraLibrary, showReadThrough,
-    toggleChat, toggleBible, toggleReadThrough,
-    setShowBrainstorm, setShowDevelopment, setShowBeatSheet,
+    showSnapshots, navRailOpen,
+    toggleChat, toggleBible,
     setShowAnalysis, setShowDialogueCoach, setShowExport,
-    setShowSettings, setShowSnapshots, setShowCameraLibrary,
-    currentProject, addNotification
+    setShowSettings, setShowSnapshots,
+    currentProject, addNotification,
   } = useStore()
 
-  // Register menu events
   useEffect(() => {
     const cleanups = [
       window.api.onMenu('menu:settings', () => setShowSettings(true)),
       window.api.onMenu('menu:export', () => setShowExport(true)),
       window.api.onMenu('menu:manual-backup', handleManualBackup),
       window.api.onMenu('menu:panic-export', handlePanicExport),
-      window.api.onMenu('view:distraction-free', () => setLayoutMode(layoutMode === 'focus' ? 'default' : 'focus')),
+      window.api.onMenu('view:distraction-free', () => {
+        setLayoutMode(layoutMode === 'focus' ? 'default' : 'focus')
+      }),
       window.api.onMenu('view:toggle-chat', toggleChat),
       window.api.onMenu('view:toggle-bible', toggleBible),
-      window.api.onMenu('view:readthrough', toggleReadThrough),
+      window.api.onMenu('view:readthrough', () => setActiveWorkspace('readthrough')),
       window.api.onMenu('menu:analyze-scene', () => setShowAnalysis(true)),
       window.api.onMenu('menu:dialogue-coach', () => setShowDialogueCoach(true)),
     ]
@@ -68,64 +70,108 @@ export default function AppShell() {
     }
   }
 
-  // Compute layout class
-  const getLayoutClass = () => {
-    if (layoutMode === 'focus') return 'layout-focus'
-    if (showChat) return 'layout-chat'
-    if (showBible) return 'layout-bible'
-    return 'layout-default'
+  function renderWorkspace() {
+    switch (activeWorkspace) {
+      case 'dashboard':
+        return <Dashboard />
+
+      case 'editor':
+        return (
+          <div className="workspace-editor-layout">
+            <div className="workspace-editor-main">
+              <ScreenplayEditor />
+            </div>
+            {showBible && layoutMode !== 'focus' && (
+              <div className="workspace-side-panel">
+                <StoryBible />
+              </div>
+            )}
+          </div>
+        )
+
+      case 'beatsheet':
+        return (
+          <div className="workspace-fullpage">
+            <BeatSheet embedded onClose={() => setActiveWorkspace('dashboard')} />
+          </div>
+        )
+
+      case 'storybible':
+        return (
+          <div className="workspace-fullpage">
+            <StoryBible embedded onClose={() => setActiveWorkspace('dashboard')} />
+          </div>
+        )
+
+      case 'brainstorm':
+        return (
+          <div className="workspace-fullpage">
+            <BrainstormCanvas embedded onClose={() => setActiveWorkspace('dashboard')} />
+          </div>
+        )
+
+      case 'cameralibrary':
+        return (
+          <div className="workspace-fullpage">
+            <CameraLibrary embedded onClose={() => setActiveWorkspace('dashboard')} />
+          </div>
+        )
+
+      case 'readthrough':
+        return (
+          <div className="workspace-fullpage">
+            <ReadThroughMode onClose={() => setActiveWorkspace('editor')} />
+          </div>
+        )
+
+      case 'development':
+        return (
+          <div className="workspace-fullpage">
+            <DevelopmentMode embedded onClose={() => setActiveWorkspace('dashboard')} />
+          </div>
+        )
+
+      default:
+        return <Dashboard />
+    }
   }
 
-  // Fullscreen modal views
-  if (showBrainstorm) return (
-    <>
-      <BrainstormCanvas onClose={() => setShowBrainstorm(false)} />
-      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
-    </>
-  )
-
-  if (showDevelopment) return (
-    <>
-      <DevelopmentMode onClose={() => setShowDevelopment(false)} />
-      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
-    </>
-  )
+  const isFocus = layoutMode === 'focus'
 
   return (
-    <div className={`app-shell ${getLayoutClass()}`}>
-      {layoutMode !== 'focus' && <Sidebar onPanic={handlePanicExport} />}
+    <div className="app-shell-v2">
+      {!isFocus && (
+        <div className="topbar-slot">
+          <TopBar onPanic={handlePanicExport} />
+        </div>
+      )}
 
-      {/* Main editor area */}
-      <div style={{ gridArea: 'main', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg-base)' }}>
-        {showReadThrough ? (
-          <ReadThroughMode onClose={toggleReadThrough} />
-        ) : (
-          <ScreenplayEditor />
+      <div className="app-body">
+        {!isFocus && (
+          <div className={`nav-rail-slot ${navRailOpen ? 'nav-rail-slot--expanded' : 'nav-rail-slot--compact'}`}>
+            <NavRail onPanic={handlePanicExport} />
+          </div>
+        )}
+        <div className="app-content">
+          {renderWorkspace()}
+        </div>
+
+        {!isFocus && showChat && (
+          <div className="global-chat-panel">
+            <ChatPanel />
+          </div>
         )}
       </div>
 
-      {/* Right panel */}
-      {showChat && !showBible && layoutMode !== 'focus' && (
-        <div style={{ gridArea: 'chat', borderLeft: '1px solid var(--border-subtle)' }}>
-          <ChatPanel />
-        </div>
-      )}
-      {showBible && layoutMode !== 'focus' && (
-        <div style={{ gridArea: 'bible', borderLeft: '1px solid var(--border-subtle)' }}>
-          <StoryBible />
-        </div>
-      )}
+      <div className="statusbar-slot">
+        <StatusBar onPanic={handlePanicExport} />
+      </div>
 
-      <StatusBar style={{ gridArea: 'statusbar' }} onPanic={handlePanicExport} />
-
-      {/* Modals */}
-      {showBeatSheet && <BeatSheet onClose={() => setShowBeatSheet(false)} />}
       {showAnalysis && <SceneAnalysis onClose={() => setShowAnalysis(false)} />}
       {showDialogueCoach && <DialogueCoach onClose={() => setShowDialogueCoach(false)} />}
       {showExport && <ExportModal onClose={() => setShowExport(false)} />}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
       {showSnapshots && <SnapshotModal onClose={() => setShowSnapshots(false)} />}
-      {showCameraLibrary && <CameraLibrary onClose={() => setShowCameraLibrary(false)} />}
       <TokenPreview />
     </div>
   )

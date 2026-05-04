@@ -106,7 +106,7 @@ const useStore = create((set, get) => ({
 
   // ─── UI Layout ─────────────────────────────────────────────────────────────
   layoutMode: 'default',
-  showChat: true,
+  showChat: false,
   showBible: false,
   showSceneNav: true,
   showReadThrough: false,
@@ -120,6 +120,15 @@ const useStore = create((set, get) => ({
   showSnapshots: false,
   showCameraLibrary: false,
   activeModal: null,
+
+  // ─── Workspace Navigation ──────────────────────────────────────────────────
+  activeWorkspace: 'dashboard',
+  lastWorkspace: null,
+  navRailOpen: true,
+
+  setActiveWorkspace: (ws) => set(s => ({ activeWorkspace: ws, lastWorkspace: s.activeWorkspace !== ws ? s.activeWorkspace : s.lastWorkspace })),
+  setNavRailOpen: (v) => set({ navRailOpen: v }),
+  toggleNavRail: () => set(s => ({ navRailOpen: !s.navRailOpen })),
 
   setLayoutMode:         (mode) => set({ layoutMode: mode }),
   toggleChat:            ()     => set(s => ({ showChat: !s.showChat })),

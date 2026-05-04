@@ -82,7 +82,7 @@ export default function ReadThroughMode({ onClose }) {
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--bg-base)' }}>
       {/* Toolbar */}
-      <div style={{ padding: '12px 24px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: 16, flexShrink: 0, paddingTop: 48 }}>
+      <div style={{ padding: '12px 24px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: 16, flexShrink: 0 }}>
         <div style={{ fontFamily: 'var(--font-display)', fontSize: 16, color: 'var(--amber)', flex: 1 }}>Read-Through</div>
         <div style={{ display: 'flex', align: 'center', gap: 10 }}>
           <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>Speed</label>

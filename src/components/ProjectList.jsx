@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import useStore from '../store'
 
 export default function ProjectList() {
-  const { projects, loadProjects, openProject, setCurrentProject, addNotification } = useStore()
+  const { projects, loadProjects, openProject, setCurrentProject, addNotification, setActiveWorkspace } = useStore()
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [newTitle, setNewTitle] = useState('')
@@ -16,10 +16,12 @@ export default function ProjectList() {
     if (!newTitle.trim()) return
     const project = await window.api.createProject({ title: newTitle.trim() })
     await openProject(project.id)
+    setActiveWorkspace('dashboard')
   }
 
   async function handleOpen(id) {
     await openProject(id)
+    setActiveWorkspace('dashboard')
   }
 
   async function handleDelete(e, id, title) {

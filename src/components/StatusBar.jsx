@@ -35,7 +35,6 @@ export default function StatusBar({ onPanic }) {
 
   return (
     <div style={{
-      gridArea: 'statusbar',
       height: 32,
       background: 'var(--bg-surface)',
       borderTop: '1px solid var(--border-subtle)',
