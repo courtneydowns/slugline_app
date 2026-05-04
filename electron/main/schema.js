@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS documents (
   project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   title TEXT NOT NULL DEFAULT 'Untitled',
   content TEXT NOT NULL DEFAULT '',
+  document_type TEXT NOT NULL DEFAULT 'screenplay',
   word_count INTEGER DEFAULT 0,
   page_count REAL DEFAULT 0,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,

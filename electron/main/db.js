@@ -11,6 +11,7 @@ function getDb() {
   db = new Database(dbPath)
   db.exec(SCHEMA)
   migrateChatSessions(db)
+  migrateDocumentTypes(db)
   return db
 }
 
@@ -64,6 +65,33 @@ function migrateChatSessions(database) {
   }
 }
 
+function inferDocumentType(title = '', content = '') {
+  if (title.startsWith('Chat Export')) return 'chat-export'
+  if (/\nChat: .+\nExported: /m.test(content)) return 'chat-export'
+  if (content.includes('\n## User\n\n') || content.includes('\n## Assistant\n\n')) return 'chat-export'
+  return 'screenplay'
+}
+
+function migrateDocumentTypes(database) {
+  const cols = database.prepare('PRAGMA table_info(documents)').all().map(c => c.name)
+
+  if (!cols.includes('document_type')) {
+    database.prepare("ALTER TABLE documents ADD COLUMN document_type TEXT NOT NULL DEFAULT 'screenplay'").run()
+  }
+
+  const docs = database.prepare('SELECT id, title, content, document_type FROM documents').all()
+  const updateType = database.prepare('UPDATE documents SET document_type = ? WHERE id = ?')
+
+  for (const doc of docs) {
+    const currentType = doc.document_type || 'screenplay'
+    const inferredType = inferDocumentType(doc.title || '', doc.content || '')
+
+    if (currentType === 'screenplay' && inferredType !== currentType) {
+      updateType.run(inferredType, doc.id)
+    }
+  }
+}
+
 // ─── Projects ────────────────────────────────────────────────────────────────
 
 function getAllProjects() {
@@ -89,7 +117,7 @@ function createProject(data = {}) {
     target_audience: data.target_audience || null,
     comparable_titles: data.comparable_titles || null
   })
-  createDocument({ project_id: result.lastInsertRowid, title: data.title || 'Main Script' })
+  createDocument({ project_id: result.lastInsertRowid, title: data.title || 'Main Script', document_type: 'screenplay' })
   return getProject(result.lastInsertRowid)
 }
 
@@ -118,14 +146,16 @@ function createDocument(data) {
   const content = data.content || ''
   const words = content.split(/\s+/).filter(Boolean).length
   const pages = Math.round((content.split('\n').length / 55) * 10) / 10
+  const documentType = data.document_type || inferDocumentType(data.title || '', content)
 
   const result = getDb().prepare(`
-    INSERT INTO documents (project_id, title, content, word_count, page_count)
-    VALUES (@project_id, @title, @content, @word_count, @page_count)
+    INSERT INTO documents (project_id, title, content, document_type, word_count, page_count)
+    VALUES (@project_id, @title, @content, @document_type, @word_count, @page_count)
   `).run({
     project_id: data.project_id,
     title: data.title || 'Untitled',
     content,
+    document_type: documentType,
     word_count: words,
     page_count: pages
   })

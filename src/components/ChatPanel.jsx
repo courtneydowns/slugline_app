@@ -20,6 +20,8 @@ export default function ChatPanel() {
   const [streaming, setStreaming] = useState('')
   const [renamingId, setRenamingId]   = useState(null)
   const [renameValue, setRenameValue] = useState('')
+  const [savingChatName, setSavingChatName] = useState(false)
+  const [saveChatTitle, setSaveChatTitle] = useState('')
   const bottomRef  = useRef()
   const inputRef   = useRef()
   const renameRef  = useRef()
@@ -128,7 +130,33 @@ export default function ChatPanel() {
     setChatHistory([])
   }
 
-  async function handleSaveChat() {
+  function getDefaultChatExportTitle() {
+    const session = chatSessions.find(s => s.id === currentChatSessionId)
+    const sessionName = session?.name || `Chat ${currentChatSessionId}`
+    const now = new Date()
+    const centralParts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Chicago',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    }).formatToParts(now).reduce((acc, part) => {
+      acc[part.type] = part.value
+      return acc
+    }, {})
+    const exportStamp = `${centralParts.year}-${centralParts.month}-${centralParts.day} ${centralParts.hour}-${centralParts.minute}`
+    return `Chat Export — ${sessionName} — ${exportStamp}`
+  }
+
+  function startSaveChatNaming() {
+    if (!hasMessagesToSave) return
+    setSaveChatTitle(getDefaultChatExportTitle())
+    setSavingChatName(true)
+  }
+
+  async function handleSaveChat(titleOverride = '') {
     if (!currentProject || !currentChatSessionId) return
 
     const messagesToSave = [
@@ -162,7 +190,7 @@ export default function ChatPanel() {
       dateStyle: 'medium',
       timeStyle: 'short'
     }).format(now)
-    const exportTitle = `Chat Export — ${sessionName} — ${exportStamp}`
+    const exportTitle = titleOverride.trim() || `Chat Export — ${sessionName} — ${exportStamp}`
 
     const transcript = [
       `# ${exportTitle}`,
@@ -183,11 +211,14 @@ export default function ChatPanel() {
       await window.api.createDocument({
         project_id: currentProject.id,
         title: exportTitle,
-        content: transcript
+        content: transcript,
+        document_type: 'chat-export'
       })
 
       const docs = await window.api.getAllDocuments(currentProject.id)
       setDocuments(docs)
+      setSavingChatName(false)
+      setSaveChatTitle('')
 
       addNotification('Saved chat to Documents.', 'success')
     } catch (err) {
@@ -396,7 +427,7 @@ export default function ChatPanel() {
           <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>Sonnet</span>
           <button
             className="btn btn-ghost btn-sm"
-            onClick={handleSaveChat}
+            onClick={startSaveChatNaming}
             disabled={!hasMessagesToSave}
             style={{ fontSize: 11, opacity: hasMessagesToSave ? 1 : 0.4 }}
             title="Save this chat as a project document"
@@ -413,6 +444,53 @@ export default function ChatPanel() {
           </button>
         </div>
       </div>
+
+      {savingChatName && (
+        <div style={{
+          display: 'flex',
+          gap: 8,
+          alignItems: 'center',
+          padding: '8px 16px',
+          borderBottom: '1px solid var(--border-subtle)',
+          background: 'var(--bg-raised)'
+        }}>
+          <input
+            className="input selectable"
+            value={saveChatTitle}
+            onChange={e => setSaveChatTitle(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter') handleSaveChat(saveChatTitle)
+              if (e.key === 'Escape') {
+                setSavingChatName(false)
+                setSaveChatTitle('')
+              }
+            }}
+            placeholder="Name this saved chat export…"
+            autoFocus
+            style={{ flex: 1, fontSize: 12 }}
+          />
+          <button
+            className="btn btn-primary btn-sm"
+            type="button"
+            onClick={() => handleSaveChat(saveChatTitle)}
+            disabled={!saveChatTitle.trim()}
+            style={{ fontSize: 11, opacity: saveChatTitle.trim() ? 1 : 0.5 }}
+          >
+            Save
+          </button>
+          <button
+            className="btn btn-ghost btn-sm"
+            type="button"
+            onClick={() => {
+              setSavingChatName(false)
+              setSaveChatTitle('')
+            }}
+            style={{ fontSize: 11 }}
+          >
+            Cancel
+          </button>
+        </div>
+      )}
 
       {/* ── Messages ── */}
       <div style={{ flex: 1, overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
