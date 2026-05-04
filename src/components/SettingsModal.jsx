@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import useStore from '../store'
 
 export default function SettingsModal({ onClose }) {
@@ -48,10 +48,18 @@ export default function SettingsModal({ onClose }) {
     { id: 'api', label: 'API Key' },
   ]
 
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onClose])
+
   return (
-    <div className="modal-overlay">
-      <div className="modal" style={{ width: 520 }}>
-        <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 0 }}>
+    <div className="modal-overlay" onMouseDown={onClose}>
+      <div className="modal" style={{ width: 520, maxHeight: '88vh', overflow: 'auto' }} onMouseDown={e => e.stopPropagation()}>
+        <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8 }}>
           <div style={{ fontFamily: 'var(--font-display)', fontSize: 18, color: 'var(--amber)', flex: 1 }}>Settings</div>
           {tabs.map(t => (
             <button key={t.id} onClick={() => setTab(t.id)} style={{
@@ -63,6 +71,15 @@ export default function SettingsModal({ onClose }) {
               {t.label}
             </button>
           ))}
+          <button
+            className="btn btn-ghost"
+            onClick={onClose}
+            title="Close Settings"
+            aria-label="Close Settings"
+            style={{ minWidth: 36, height: 32, padding: '0 10px', fontSize: 18, lineHeight: 1 }}
+          >
+            ×
+          </button>
         </div>
 
         <div style={{ padding: 24 }}>
