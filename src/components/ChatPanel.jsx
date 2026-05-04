@@ -2,12 +2,26 @@ import React, { useState, useRef, useEffect } from 'react'
 import useStore from '../store'
 
 export default function ChatPanel() {
-  const { currentProject, currentDocument, chatHistory, setChatHistory, addNotification } = useStore()
-  const [input, setInput] = useState('')
-  const [loading, setLoading] = useState(false)
+  const {
+    currentProject,
+    currentDocument,
+    chatHistory,
+    setChatHistory,
+    chatSessions,
+    setChatSessions,
+    currentChatSessionId,
+    setCurrentChatSessionId,
+    addNotification
+  } = useStore()
+
+  const [input, setInput]       = useState('')
+  const [loading, setLoading]   = useState(false)
   const [streaming, setStreaming] = useState('')
-  const bottomRef = useRef()
-  const inputRef = useRef()
+  const [renamingId, setRenamingId]   = useState(null)
+  const [renameValue, setRenameValue] = useState('')
+  const bottomRef  = useRef()
+  const inputRef   = useRef()
+  const renameRef  = useRef()
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -21,9 +35,89 @@ export default function ChatPanel() {
     return cleanup
   }, [])
 
+  // When project changes, sessions are loaded by store.loadProjectData.
+  // When currentChatSessionId changes due to a tab switch, reload history.
+  const prevSessionRef = useRef(currentChatSessionId)
+  useEffect(() => {
+    if (!currentProject || currentChatSessionId === prevSessionRef.current) return
+    prevSessionRef.current = currentChatSessionId
+    if (currentChatSessionId) {
+      window.api.getChatHistory(currentProject.id, 'chat', currentChatSessionId)
+        .then(msgs => setChatHistory(msgs))
+        .catch(() => setChatHistory([]))
+    } else {
+      setChatHistory([])
+    }
+  }, [currentChatSessionId, currentProject])
+
+  // ── Session actions ───────────────────────────────────────────────────────
+
+  async function handleNewChat() {
+    if (!currentProject) return
+    const session = await window.api.createChatSession(currentProject.id)
+    const updated = await window.api.getChatSessions(currentProject.id)
+    setChatSessions(updated)
+    setCurrentChatSessionId(session.id)
+    // history will be empty for new session — set it immediately
+    setChatHistory([])
+  }
+
+  function handleSelectSession(id) {
+    if (id === currentChatSessionId) return
+    setStreaming('')
+    setCurrentChatSessionId(id)
+    // history reload handled by effect above
+  }
+
+  function startRename(session) {
+    setRenamingId(session.id)
+    setRenameValue(session.name)
+    setTimeout(() => renameRef.current?.focus(), 50)
+  }
+
+  async function commitRename(id) {
+    const trimmed = renameValue.trim()
+    if (!trimmed) { setRenamingId(null); return }
+    await window.api.renameChatSession(id, trimmed)
+    const updated = await window.api.getChatSessions(currentProject.id)
+    setChatSessions(updated)
+    setRenamingId(null)
+  }
+
+  async function handleDeleteSession(session, e) {
+    e.stopPropagation()
+    if (!currentProject || chatSessions.length <= 1) return
+    if (!confirm(`Delete "${session.name}"? Its chat history will be permanently removed.`)) return
+
+    await window.api.deleteChatSession(session.id)
+
+    const updated = await window.api.getChatSessions(currentProject.id)
+    setChatSessions(updated)
+
+    if (session.id === currentChatSessionId) {
+      const nextSession = updated[0] || null
+      setCurrentChatSessionId(nextSession?.id || null)
+      if (nextSession) {
+        const msgs = await window.api.getChatHistory(currentProject.id, 'chat', nextSession.id)
+        setChatHistory(msgs)
+      } else {
+        setChatHistory([])
+      }
+    }
+  }
+
+  async function handleClear() {
+    if (!currentProject || !currentChatSessionId) return
+    if (!confirm("Clear this chat\'s history?")) return
+    await window.api.clearChatHistory(currentProject.id, 'chat', currentChatSessionId)
+    setChatHistory([])
+  }
+
+  // ── Send ─────────────────────────────────────────────────────────────────
+
   async function handleSend(e) {
     e.preventDefault()
-    if (!input.trim() || loading || !currentProject) return
+    if (!input.trim() || loading || !currentProject || !currentChatSessionId) return
     const message = input.trim()
     setInput('')
     setLoading(true)
@@ -33,13 +127,13 @@ export default function ChatPanel() {
 
     try {
       await window.api.claudeChat({
-        projectId: currentProject.id,
+        projectId:       currentProject.id,
         message,
-        chatHistory: chatHistory.slice(-10),
-        documentContext: context
+        chatHistory:     chatHistory.slice(-10),
+        documentContext: context,
+        chatSessionId:   currentChatSessionId
       })
-      // Reload chat history
-      const updated = await window.api.getChatHistory(currentProject.id, 'chat')
+      const updated = await window.api.getChatHistory(currentProject.id, 'chat', currentChatSessionId)
       setChatHistory(updated)
     } catch (err) {
       addNotification('Chat error: ' + err.message, 'error')
@@ -48,31 +142,151 @@ export default function ChatPanel() {
     setLoading(false)
   }
 
-  async function handleClear() {
-    if (!confirm('Clear this chat history?')) return
-    await window.api.clearChatHistory(currentProject.id, 'chat')
-    setChatHistory([])
-  }
+  // ── Render ────────────────────────────────────────────────────────────────
 
   const allMessages = [
     ...chatHistory,
     ...(streaming ? [{ id: 'streaming', role: 'assistant', content: streaming }] : [])
   ]
 
+  const noSession = !currentChatSessionId
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg-panel)' }}>
-      {/* Header */}
-      <div style={{ padding: '16px 16px 12px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 48 }}>
+
+      {/* ── Session tab bar ── */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 2,
+        padding: '48px 8px 0',
+        borderBottom: '1px solid var(--border-subtle)',
+        overflowX: 'auto',
+        flexShrink: 0,
+        scrollbarWidth: 'none'
+      }}>
+        {chatSessions.map(session => (
+          <div
+            key={session.id}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              padding: '6px 10px',
+              borderRadius: '6px 6px 0 0',
+              cursor: 'pointer',
+              flexShrink: 0,
+              background: session.id === currentChatSessionId ? 'var(--bg-raised)' : 'transparent',
+              borderBottom: session.id === currentChatSessionId ? '2px solid var(--amber)' : '2px solid transparent',
+              color: session.id === currentChatSessionId ? 'var(--text-primary)' : 'var(--text-muted)',
+              transition: 'color 0.15s'
+            }}
+            onClick={() => handleSelectSession(session.id)}
+          >
+            {renamingId === session.id ? (
+              <input
+                ref={renameRef}
+                value={renameValue}
+                onChange={e => setRenameValue(e.target.value)}
+                onBlur={() => commitRename(session.id)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') commitRename(session.id)
+                  if (e.key === 'Escape') setRenamingId(null)
+                  e.stopPropagation()
+                }}
+                onClick={e => e.stopPropagation()}
+                style={{
+                  fontSize: 12,
+                  fontFamily: 'var(--font-ui)',
+                  background: 'var(--bg-input, var(--bg-base))',
+                  border: '1px solid var(--amber)',
+                  borderRadius: 3,
+                  color: 'var(--text-primary)',
+                  padding: '1px 4px',
+                  width: 90,
+                  outline: 'none'
+                }}
+              />
+            ) : (
+              <span
+                style={{ fontSize: 12, maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                onDoubleClick={e => { e.stopPropagation(); startRename(session) }}
+                title={`${session.name} — double-click to rename`}
+              >
+                {session.name}
+              </span>
+            )}
+
+            {chatSessions.length > 1 && (
+              <button
+                type="button"
+                title={`Delete ${session.name}`}
+                aria-label={`Delete ${session.name}`}
+                onClick={e => handleDeleteSession(session, e)}
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
+                  fontSize: 13,
+                  lineHeight: 1,
+                  padding: '0 2px'
+                }}
+              >
+                ×
+              </button>
+            )}
+          </div>
+        ))}
+
+        {/* New chat button */}
+        <button
+          className="btn btn-ghost btn-sm"
+          onClick={handleNewChat}
+          title="New chat"
+          style={{
+            fontSize: 16,
+            lineHeight: 1,
+            padding: '4px 8px',
+            color: 'var(--text-muted)',
+            flexShrink: 0,
+            marginLeft: 2
+          }}
+        >
+          +
+        </button>
+      </div>
+
+      {/* ── Header ── */}
+      <div style={{
+        padding: '10px 16px 10px',
+        borderBottom: '1px solid var(--border-subtle)',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+      }}>
         <div style={{ fontFamily: 'var(--font-display)', fontSize: 15, color: 'var(--amber)' }}>Claude Chat</div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>Sonnet</span>
-          <button className="btn btn-ghost btn-sm" onClick={handleClear} style={{ fontSize: 11 }}>Clear</button>
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={handleClear}
+            disabled={noSession}
+            style={{ fontSize: 11, opacity: noSession ? 0.4 : 1 }}
+          >
+            Clear
+          </button>
         </div>
       </div>
 
-      {/* Messages */}
+      {/* ── Messages ── */}
       <div style={{ flex: 1, overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {allMessages.length === 0 && (
+        {noSession ? (
+          <div style={{ textAlign: 'center', padding: '32px 16px', color: 'var(--text-muted)' }}>
+            <div style={{ fontSize: 24, marginBottom: 8 }}>💬</div>
+            <div style={{ fontSize: 13 }}>Press <strong>+</strong> to start a new chat.</div>
+          </div>
+        ) : allMessages.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '32px 16px', color: 'var(--text-muted)' }}>
             <div style={{ fontSize: 24, marginBottom: 8 }}>💬</div>
             <div style={{ fontSize: 13 }}>Ask Claude anything about your screenplay.</div>
@@ -80,34 +294,36 @@ export default function ChatPanel() {
               "What motivates my protagonist?" or "Help me fix the midpoint."
             </div>
           </div>
+        ) : (
+          allMessages.map(msg => (
+            <div key={msg.id} style={{ display: 'flex', gap: 8 }}>
+              <div style={{
+                fontSize: 10, fontWeight: 600,
+                color: msg.role === 'user' ? 'var(--amber)' : 'var(--text-muted)',
+                minWidth: 16, paddingTop: 2
+              }}>
+                {msg.role === 'user' ? 'You' : 'AI'}
+              </div>
+              <div style={{
+                flex: 1,
+                fontSize: 13,
+                lineHeight: 1.6,
+                color: 'var(--text-primary)',
+                background: msg.role === 'assistant' ? 'var(--bg-raised)' : 'transparent',
+                padding: msg.role === 'assistant' ? '10px 12px' : '2px 0',
+                borderRadius: 8,
+                whiteSpace: 'pre-wrap'
+              }}>
+                {msg.content}
+                {msg.id === 'streaming' && <span style={{ animation: 'pulse 1s infinite', opacity: 0.5 }}>▌</span>}
+              </div>
+            </div>
+          ))
         )}
-        {allMessages.map(msg => (
-          <div key={msg.id} style={{ display: 'flex', gap: 8 }}>
-            <div style={{
-              fontSize: 10, fontWeight: 600, color: msg.role === 'user' ? 'var(--amber)' : 'var(--text-muted)',
-              minWidth: 16, paddingTop: 2
-            }}>
-              {msg.role === 'user' ? 'You' : 'AI'}
-            </div>
-            <div style={{
-              flex: 1,
-              fontSize: 13,
-              lineHeight: 1.6,
-              color: 'var(--text-primary)',
-              background: msg.role === 'assistant' ? 'var(--bg-raised)' : 'transparent',
-              padding: msg.role === 'assistant' ? '10px 12px' : '2px 0',
-              borderRadius: 8,
-              whiteSpace: 'pre-wrap'
-            }}>
-              {msg.content}
-              {msg.id === 'streaming' && <span style={{ animation: 'pulse 1s infinite', opacity: 0.5 }}>▌</span>}
-            </div>
-          </div>
-        ))}
         <div ref={bottomRef} />
       </div>
 
-      {/* Input */}
+      {/* ── Input ── */}
       <div style={{ padding: 12, borderTop: '1px solid var(--border-subtle)' }}>
         <form onSubmit={handleSend} style={{ display: 'flex', gap: 8 }}>
           <textarea
@@ -115,9 +331,10 @@ export default function ChatPanel() {
             className="input selectable"
             value={input}
             onChange={e => setInput(e.target.value)}
-            placeholder="Ask about your screenplay…"
+            placeholder={noSession ? 'Start a new chat first…' : 'Ask about your screenplay…'}
             rows={2}
-            style={{ flex: 1, resize: 'none', fontSize: 13 }}
+            disabled={noSession}
+            style={{ flex: 1, resize: 'none', fontSize: 13, opacity: noSession ? 0.5 : 1 }}
             onKeyDown={e => {
               if (e.key === 'Enter' && !e.shiftKey) handleSend(e)
             }}
@@ -125,14 +342,14 @@ export default function ChatPanel() {
           <button
             className="btn btn-primary"
             type="submit"
-            disabled={loading || !input.trim()}
-            style={{ alignSelf: 'flex-end', opacity: loading || !input.trim() ? 0.5 : 1 }}
+            disabled={loading || !input.trim() || noSession}
+            style={{ alignSelf: 'flex-end', opacity: loading || !input.trim() || noSession ? 0.5 : 1 }}
           >
             {loading ? '…' : '→'}
           </button>
         </form>
         <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4 }}>
-          Shift+Enter for new line • Chat history saved per project
+          Shift+Enter for new line • Double-click tab to rename
         </div>
       </div>
     </div>

@@ -1,20 +1,7 @@
 const Anthropic = require('@anthropic-ai/sdk')
 const { getApiKey } = require('./config')
 const db = require('./db')
-
-const MODELS = {
-  haiku: 'claude-haiku-4-5-20251001',
-  sonnet: 'claude-sonnet-4-6',
-  opus: 'claude-opus-4-6'
-}
-
-function getModelForFeature(feature) {
-  const haiku = ['auto-tag', 'spellcheck', 'scene-detect', 'token-count', 'research-ingest', 'summarize-context', 'word-count']
-  const opus  = ['full-rewrite', 'story-bible-generate', 'beat-sheet-analyze', 'tv-vs-feature', 'plot-analysis', 'structure-analysis']
-  if (haiku.includes(feature)) return MODELS.haiku
-  if (opus.includes(feature))  return MODELS.opus
-  return MODELS.sonnet
-}
+const { CLAUDE_MODELS, selectClaudeModel, selectMaxTokens } = require('./claude-config')
 
 function getClient() {
   const key = getApiKey()
@@ -26,9 +13,10 @@ function estimateTokens(text) {
   return Math.ceil((text || '').length / 4)
 }
 
-async function complete({ feature, messages, system, projectId, maxTokens = 1000 }) {
-  const model  = getModelForFeature(feature)
-  const client = getClient()
+async function complete({ feature, messages, system, projectId }) {
+  const model     = selectClaudeModel(feature)
+  const maxTokens = selectMaxTokens(feature)
+  const client    = getClient()
   const inputEstimate = estimateTokens((system || '') + messages.map(m => typeof m.content === 'string' ? m.content : JSON.stringify(m.content)).join('\n'))
 
   const response = await client.messages.create({ model, max_tokens: maxTokens, system: system || undefined, messages })
@@ -46,7 +34,7 @@ async function complete({ feature, messages, system, projectId, maxTokens = 1000
 async function handleValidateApiKey(event, { apiKey }) {
   try {
     const client = new Anthropic({ apiKey })
-    await client.messages.create({ model: MODELS.haiku, max_tokens: 10, messages: [{ role: 'user', content: 'Hi' }] })
+    await client.messages.create({ model: CLAUDE_MODELS.haiku, max_tokens: selectMaxTokens('validate'), messages: [{ role: 'user', content: 'Hi' }] })
     const { setApiKey } = require('./config')
     setApiKey(apiKey)
     return { valid: true }
@@ -55,13 +43,12 @@ async function handleValidateApiKey(event, { apiKey }) {
   }
 }
 
-async function handleChat(event, { projectId, message, chatHistory, documentContext }) {
-  const model  = MODELS.sonnet
+async function handleChat(event, { projectId, message, chatHistory, documentContext, chatSessionId }) {
+  const model  = selectClaudeModel('chat')
   const client = getClient()
 
   const project = db.getProject(projectId)
 
-  // Build context — include story bible for richer responses
   const characters   = db.getCharacters(projectId)
   const worldNotes   = db.getWorldBuilding(projectId)
   const research     = db.getResearch(projectId)
@@ -85,30 +72,28 @@ async function handleChat(event, { projectId, message, chatHistory, documentCont
   const recentHistory = (chatHistory || []).slice(-10).map(m => ({ role: m.role, content: m.content }))
   const messages      = [...recentHistory, { role: 'user', content: message }]
 
-  db.addChatMessage({ project_id: projectId, role: 'user', content: message, context: 'chat' })
+  db.addChatMessage({ project_id: projectId, role: 'user', content: message, context: 'chat', chat_session_id: chatSessionId || null })
 
   let fullContent = ''
 
   try {
-    const stream = client.messages.stream({ model, max_tokens: 2000, system: systemPrompt, messages })
+    const stream = client.messages.stream({ model, max_tokens: selectMaxTokens('chat'), system: systemPrompt, messages })
 
     stream.on('text', (text) => {
       fullContent += text
       event.sender.send('claude:stream-chunk', { chunk: text })
     })
 
-    // FIX: call finalMessage only once
     const finalMsg = await stream.finalMessage()
     const usage    = finalMsg.usage
 
-    db.addChatMessage({ project_id: projectId, role: 'assistant', content: fullContent, model, tokens_used: usage?.output_tokens || 0, context: 'chat' })
+    db.addChatMessage({ project_id: projectId, role: 'assistant', content: fullContent, model, tokens_used: usage?.output_tokens || 0, context: 'chat', chat_session_id: chatSessionId || null })
     db.logTokenUsage({ project_id: projectId, model, feature: 'chat', input_tokens: usage?.input_tokens || 0, output_tokens: usage?.output_tokens || 0 })
 
     return { content: fullContent, model, usage }
   } catch (err) {
-    // Save whatever streamed before the error
     if (fullContent) {
-      db.addChatMessage({ project_id: projectId, role: 'assistant', content: fullContent, model, context: 'chat' })
+      db.addChatMessage({ project_id: projectId, role: 'assistant', content: fullContent, model, context: 'chat', chat_session_id: chatSessionId || null })
     }
     throw err
   }
@@ -116,7 +101,7 @@ async function handleChat(event, { projectId, message, chatHistory, documentCont
 
 async function handleInlineSuggestion(event, { projectId, selectedText, instruction, context }) {
   return complete({
-    feature: 'inline-suggest', projectId, maxTokens: 800,
+    feature: 'inline-suggest', projectId,
     system: 'You are a screenplay editor. Provide a single improved version of the given text. Return ONLY the rewritten text with a brief one-sentence explanation prefixed with "WHY: ". Format: WHY: [reason]\n\n[rewritten text]',
     messages: [{ role: 'user', content: `Context: ${context || ''}\n\nText to improve: "${selectedText}"\n\nInstruction: ${instruction || 'Improve this for a screenplay'}` }]
   })
@@ -124,7 +109,7 @@ async function handleInlineSuggestion(event, { projectId, selectedText, instruct
 
 async function handleFullRewrite(event, { projectId, content, instruction }) {
   return complete({
-    feature: 'full-rewrite', projectId, maxTokens: 4000,
+    feature: 'full-rewrite', projectId,
     system: 'You are an expert screenplay writer. Rewrite the provided scene or section. Maintain proper screenplay format. After the rewrite, add a section starting with "---CHANGES---" listing the key changes you made and why.',
     messages: [{ role: 'user', content: `${instruction || 'Rewrite and improve this scene:'}\n\n${content}` }]
   })
@@ -132,7 +117,7 @@ async function handleFullRewrite(event, { projectId, content, instruction }) {
 
 async function handleToneAdjust(event, { projectId, content, targetTone }) {
   return complete({
-    feature: 'tone-adjust', projectId, maxTokens: 2000,
+    feature: 'tone-adjust', projectId,
     system: 'You are a screenplay editor specializing in tone and voice. Adjust the writing tone while preserving the story content and screenplay format. Add WHY: [explanation] at the end.',
     messages: [{ role: 'user', content: `Adjust this to be more ${targetTone}:\n\n${content}` }]
   })
@@ -140,10 +125,8 @@ async function handleToneAdjust(event, { projectId, content, targetTone }) {
 
 async function handleSceneAnalysis(event, { projectId, sceneContent }) {
   const result = await complete({
-    feature: 'scene-analyze', projectId, maxTokens: 1000,
-    system: `You are a screenplay analyst. Analyze the scene and return a JSON object with these exact keys:
-{"pacing":"fast|medium|slow","tension":1-10,"dialogueRatio":0-100,"hasConflict":true|false,"movesStoryForward":true|false,"conflict":"description or null","issues":["array"],"strengths":["array"],"suggestions":["array"]}
-Return ONLY valid JSON, no other text.`,
+    feature: 'scene-analyze', projectId,
+    system: `You are a screenplay analyst. Analyze the scene and return a JSON object with these exact keys:\n{"pacing":"fast|medium|slow","tension":1-10,"dialogueRatio":0-100,"hasConflict":true|false,"movesStoryForward":true|false,"conflict":"description or null","issues":["array"],"strengths":["array"],"suggestions":["array"]}\nReturn ONLY valid JSON, no other text.`,
     messages: [{ role: 'user', content: sceneContent }]
   })
   try { return { ...result, analysis: JSON.parse(result.content) } }
@@ -152,10 +135,8 @@ Return ONLY valid JSON, no other text.`,
 
 async function handleDialogueCoach(event, { projectId, content }) {
   const result = await complete({
-    feature: 'dialogue-coach', projectId, maxTokens: 1500,
-    system: `You are a dialogue expert for screenwriting. Analyze the dialogue and return JSON:
-{"characterVoiceIssues":[{"character":"name","issue":"description","example":"line"}],"onTheNoseLines":[{"line":"text","suggestion":"improvement"}],"tooLongMonologues":[{"character":"name","lineCount":0}],"redundantLines":[{"line":"text","reason":"why"}],"overallScore":1-10,"summary":"assessment"}
-Return ONLY valid JSON.`,
+    feature: 'dialogue-coach', projectId,
+    system: `You are a dialogue expert for screenwriting. Analyze the dialogue and return JSON:\n{"characterVoiceIssues":[{"character":"name","issue":"description","example":"line"}],"onTheNoseLines":[{"line":"text","suggestion":"improvement"}],"tooLongMonologues":[{"character":"name","lineCount":0}],"redundantLines":[{"line":"text","reason":"why"}],"overallScore":1-10,"summary":"assessment"}\nReturn ONLY valid JSON.`,
     messages: [{ role: 'user', content }]
   })
   try { return { ...result, analysis: JSON.parse(result.content) } }
@@ -165,7 +146,7 @@ Return ONLY valid JSON.`,
 async function handleDevelopmentQuestion(event, { projectId, question, answers, step, isBeginnerMode }) {
   const project = db.getProject(projectId)
   return complete({
-    feature: 'development', projectId, maxTokens: 1200,
+    feature: 'development', projectId,
     system: isBeginnerMode
       ? 'You are a warm, encouraging screenplay development mentor working with a complete beginner. Ask one question at a time. Explain every term in plain language with examples. Be specific and encouraging. Help them discover their story.'
       : 'You are a screenplay development consultant. Guide the writer through structured development questions efficiently.',
@@ -176,7 +157,7 @@ async function handleDevelopmentQuestion(event, { projectId, question, answers, 
 async function handleGenerateStoryBible(event, { projectId }) {
   const data   = db.getFullProjectData(projectId)
   const result = await complete({
-    feature: 'story-bible-generate', projectId, maxTokens: 3000,
+    feature: 'story-bible-generate', projectId,
     system: 'You are a screenplay development expert. Generate a comprehensive story bible from the provided development answers. Return JSON with keys: characters (array of {name,role,arc,traits,relationships,notes}), worldNotes (array of {category,title,content}), themes (array of strings), tone_description (string). Return ONLY valid JSON.',
     messages: [{ role: 'user', content: JSON.stringify(data.project) }]
   })
@@ -192,7 +173,7 @@ async function handleGenerateStoryBible(event, { projectId }) {
 
 async function handleLoglineAssist(event, { projectId, answers }) {
   const result = await complete({
-    feature: 'logline', projectId, maxTokens: 600,
+    feature: 'logline', projectId,
     system: 'You are a logline specialist. Generate 3 logline options based on the story details. Format: return JSON array of 3 strings, each a complete logline.',
     messages: [{ role: 'user', content: JSON.stringify(answers) }]
   })
@@ -202,7 +183,7 @@ async function handleLoglineAssist(event, { projectId, answers }) {
 
 async function handleResearchIngest(event, { projectId, title, content, sourceType, sourceUrl }) {
   const result = await complete({
-    feature: 'research-ingest', projectId, maxTokens: 500,
+    feature: 'research-ingest', projectId,
     system: 'You are a research assistant for screenwriters. Summarize the provided content into a concise, useful reference. Focus on facts, details, and elements relevant to storytelling. Keep it under 200 words.',
     messages: [{ role: 'user', content: `Title: ${title}\n\nContent:\n${content.slice(0, 8000)}` }]
   })
@@ -213,7 +194,7 @@ async function handleResearchIngest(event, { projectId, title, content, sourceTy
 async function handleAutoTag(event, { projectId, documentId }) {
   const doc    = db.getDocument(documentId)
   const result = await complete({
-    feature: 'auto-tag', projectId, maxTokens: 300,
+    feature: 'auto-tag', projectId,
     system: 'Extract scene headings from this screenplay text. Return a JSON array of objects: [{heading: "INT. LOCATION - DAY", characters: ["NAME1"], location: "text", time: "DAY|NIGHT|CONTINUOUS"}]. Return ONLY valid JSON.',
     messages: [{ role: 'user', content: doc.content.slice(0, 6000) }]
   })
@@ -224,7 +205,7 @@ async function handleAutoTag(event, { projectId, documentId }) {
 async function handleWritingPrompt(event, { projectId, currentContent, cursorContext }) {
   const project = db.getProject(projectId)
   return complete({
-    feature: 'writing-prompt', projectId, maxTokens: 200,
+    feature: 'writing-prompt', projectId,
     system: 'You are a screenplay writing coach. Given the current scene context, provide ONE specific, targeted writing question or prompt to help the writer continue. Be specific to what they are writing. Keep it to 1-2 sentences. Be encouraging.',
     messages: [{ role: 'user', content: `Script: "${project.title}"\nLogline: "${project.logline || 'Not yet defined'}"\n\nCurrent writing:\n${cursorContext}` }]
   })
@@ -232,7 +213,7 @@ async function handleWritingPrompt(event, { projectId, currentContent, cursorCon
 
 async function handleTvVsFeature(event, { projectId, storyIdea }) {
   const result = await complete({
-    feature: 'tv-vs-feature', projectId, maxTokens: 1500,
+    feature: 'tv-vs-feature', projectId,
     system: 'You are a development executive. Analyze the story idea. Return JSON: {"recommendation":"feature|pilot","confidence":1-10,"featureCase":"argument","pilotCase":"argument","recommendation_reason":"why","format_details":"suggestions"}. Return ONLY valid JSON.',
     messages: [{ role: 'user', content: storyIdea }]
   })
@@ -242,7 +223,7 @@ async function handleTvVsFeature(event, { projectId, storyIdea }) {
 
 async function handleBeatSheetAnalysis(event, { projectId, beats, documentContent }) {
   const result = await complete({
-    feature: 'beat-sheet-analyze', projectId, maxTokens: 2000,
+    feature: 'beat-sheet-analyze', projectId,
     system: 'You are a story structure expert. Analyze the beat sheet and screenplay content. Return JSON: {"missing_beats":["names"],"weak_beats":[{"beat":"name","issue":"desc","suggestion":"fix"}],"strengths":["list"],"overall_structure_score":1-10,"pacing_assessment":"description"}. Return ONLY valid JSON.',
     messages: [{ role: 'user', content: `Beat sheet: ${JSON.stringify(beats)}\n\nScript excerpt: ${documentContent?.slice(0, 3000) || 'No script yet'}` }]
   })

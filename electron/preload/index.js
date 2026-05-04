@@ -34,9 +34,15 @@ contextBridge.exposeInMainWorld('api', {
   upsertBeat: (data) => ipcRenderer.invoke('beats:upsert', data),
   initBeats: (projectId, format) => ipcRenderer.invoke('beats:init', { projectId, format }),
 
+  // Chat sessions
+  getChatSessions: (projectId) => ipcRenderer.invoke('chat:get-sessions', { projectId }),
+  createChatSession: (projectId, name) => ipcRenderer.invoke('chat:create-session', { projectId, name }),
+  renameChatSession: (id, name) => ipcRenderer.invoke('chat:rename-session', { id, name }),
+  deleteChatSession: (id) => ipcRenderer.invoke('chat:delete-session', { id }),
+
   // Chat
-  getChatHistory: (projectId, context) => ipcRenderer.invoke('chat:get-history', { projectId, context }),
-  clearChatHistory: (projectId, context) => ipcRenderer.invoke('chat:clear', { projectId, context }),
+  getChatHistory: (projectId, context, sessionId) => ipcRenderer.invoke('chat:get-history', { projectId, context, sessionId }),
+  clearChatHistory: (projectId, context, sessionId) => ipcRenderer.invoke('chat:clear', { projectId, context, sessionId }),
 
   // Brainstorm
   getBrainstormEntries: (projectId) => ipcRenderer.invoke('brainstorm:get-all', projectId),

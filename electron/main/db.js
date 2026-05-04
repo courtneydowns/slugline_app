@@ -10,7 +10,58 @@ function getDb() {
   const dbPath = path.join(app.getPath('userData'), 'slugline.db')
   db = new Database(dbPath)
   db.exec(SCHEMA)
+  migrateChatSessions(db)
   return db
+}
+
+// ─── Migration: Chat Sessions ─────────────────────────────────────────────────
+// Safe, idempotent. Runs once on first getDb() call.
+// Creates chat_sessions table, adds chat_session_id column to chat_history,
+// and assigns all existing orphaned messages to a default "Chat 1" session.
+
+function migrateChatSessions(database) {
+  // 1. Create chat_sessions table if it doesn't exist
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS chat_sessions (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      project_id INTEGER NOT NULL,
+      name       TEXT    NOT NULL DEFAULT 'Chat 1',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `)
+
+  // 2. Add chat_session_id column to chat_history if missing
+  const cols = database.prepare('PRAGMA table_info(chat_history)').all().map(c => c.name)
+  if (!cols.includes('chat_session_id')) {
+    database.prepare('ALTER TABLE chat_history ADD COLUMN chat_session_id INTEGER').run()
+  }
+
+  // 3. For each project with orphaned messages, create a default session and assign
+  const orphanedProjects = database.prepare(`
+    SELECT DISTINCT project_id FROM chat_history
+    WHERE chat_session_id IS NULL AND context = 'chat'
+  `).all()
+
+  for (const { project_id } of orphanedProjects) {
+    const existing = database.prepare(
+      'SELECT id FROM chat_sessions WHERE project_id = ? ORDER BY created_at LIMIT 1'
+    ).get(project_id)
+
+    let sessionId
+    if (existing) {
+      sessionId = existing.id
+    } else {
+      const result = database.prepare(
+        "INSERT INTO chat_sessions (project_id, name) VALUES (?, 'Chat 1')"
+      ).run(project_id)
+      sessionId = result.lastInsertRowid
+    }
+
+    database.prepare(
+      'UPDATE chat_history SET chat_session_id = ? WHERE project_id = ? AND chat_session_id IS NULL AND context = ?'
+    ).run(sessionId, project_id, 'chat')
+  }
 }
 
 // ─── Projects ────────────────────────────────────────────────────────────────
@@ -38,7 +89,6 @@ function createProject(data = {}) {
     target_audience: data.target_audience || null,
     comparable_titles: data.comparable_titles || null
   })
-  // Create default document
   createDocument({ project_id: result.lastInsertRowid, title: data.title || 'Main Script' })
   return getProject(result.lastInsertRowid)
 }
@@ -152,35 +202,35 @@ function initializeBeatSheet(projectId, format) {
   if (existing.c > 0) return getBeatSheet(projectId)
 
   const featureBeats = [
-    { beat_name: 'Opening Image', beat_type: 'act1', target_page: 1, position: 1 },
-    { beat_name: 'Theme Stated', beat_type: 'act1', target_page: 5, position: 2 },
-    { beat_name: 'Set-Up', beat_type: 'act1', target_page: 10, position: 3 },
-    { beat_name: 'Catalyst / Inciting Incident', beat_type: 'act1', target_page: 12, position: 4 },
-    { beat_name: 'Debate', beat_type: 'act1', target_page: 20, position: 5 },
-    { beat_name: 'Break Into Two', beat_type: 'act1', target_page: 25, position: 6 },
-    { beat_name: 'B Story', beat_type: 'act2a', target_page: 30, position: 7 },
-    { beat_name: 'Fun and Games', beat_type: 'act2a', target_page: 45, position: 8 },
-    { beat_name: 'Midpoint', beat_type: 'act2a', target_page: 55, position: 9 },
-    { beat_name: 'Bad Guys Close In', beat_type: 'act2b', target_page: 65, position: 10 },
-    { beat_name: 'All Is Lost', beat_type: 'act2b', target_page: 75, position: 11 },
-    { beat_name: 'Dark Night of the Soul', beat_type: 'act2b', target_page: 80, position: 12 },
-    { beat_name: 'Break Into Three', beat_type: 'act3', target_page: 85, position: 13 },
-    { beat_name: 'Finale', beat_type: 'act3', target_page: 95, position: 14 },
-    { beat_name: 'Final Image', beat_type: 'act3', target_page: 110, position: 15 }
+    { beat_name: 'Opening Image',              beat_type: 'act1',  target_page: 1,   position: 1  },
+    { beat_name: 'Theme Stated',               beat_type: 'act1',  target_page: 5,   position: 2  },
+    { beat_name: 'Set-Up',                     beat_type: 'act1',  target_page: 10,  position: 3  },
+    { beat_name: 'Catalyst / Inciting Incident',beat_type: 'act1', target_page: 12,  position: 4  },
+    { beat_name: 'Debate',                     beat_type: 'act1',  target_page: 20,  position: 5  },
+    { beat_name: 'Break Into Two',             beat_type: 'act1',  target_page: 25,  position: 6  },
+    { beat_name: 'B Story',                    beat_type: 'act2a', target_page: 30,  position: 7  },
+    { beat_name: 'Fun and Games',              beat_type: 'act2a', target_page: 45,  position: 8  },
+    { beat_name: 'Midpoint',                   beat_type: 'act2a', target_page: 55,  position: 9  },
+    { beat_name: 'Bad Guys Close In',          beat_type: 'act2b', target_page: 65,  position: 10 },
+    { beat_name: 'All Is Lost',                beat_type: 'act2b', target_page: 75,  position: 11 },
+    { beat_name: 'Dark Night of the Soul',     beat_type: 'act2b', target_page: 80,  position: 12 },
+    { beat_name: 'Break Into Three',           beat_type: 'act3',  target_page: 85,  position: 13 },
+    { beat_name: 'Finale',                     beat_type: 'act3',  target_page: 95,  position: 14 },
+    { beat_name: 'Final Image',                beat_type: 'act3',  target_page: 110, position: 15 }
   ]
 
   const pilotBeats = [
-    { beat_name: 'Cold Open / Teaser', beat_type: 'teaser', target_page: 1, position: 1 },
-    { beat_name: 'World Established', beat_type: 'act1', target_page: 8, position: 2 },
-    { beat_name: 'Protagonist Introduced', beat_type: 'act1', target_page: 5, position: 3 },
-    { beat_name: 'Inciting Incident', beat_type: 'act1', target_page: 12, position: 4 },
-    { beat_name: 'End of Act One', beat_type: 'act1', target_page: 18, position: 5 },
-    { beat_name: 'Escalation', beat_type: 'act2', target_page: 25, position: 6 },
-    { beat_name: 'Midpoint Complication', beat_type: 'act2', target_page: 32, position: 7 },
-    { beat_name: 'End of Act Two', beat_type: 'act2', target_page: 40, position: 8 },
-    { beat_name: 'Climax', beat_type: 'act3', target_page: 48, position: 9 },
-    { beat_name: 'Resolution / New Normal', beat_type: 'act3', target_page: 55, position: 10 },
-    { beat_name: 'Series Hook / Tag', beat_type: 'tag', target_page: 58, position: 11 }
+    { beat_name: 'Cold Open / Teaser',        beat_type: 'teaser', target_page: 1,  position: 1  },
+    { beat_name: 'World Established',         beat_type: 'act1',   target_page: 8,  position: 2  },
+    { beat_name: 'Protagonist Introduced',    beat_type: 'act1',   target_page: 5,  position: 3  },
+    { beat_name: 'Inciting Incident',         beat_type: 'act1',   target_page: 12, position: 4  },
+    { beat_name: 'End of Act One',            beat_type: 'act1',   target_page: 18, position: 5  },
+    { beat_name: 'Escalation',                beat_type: 'act2',   target_page: 25, position: 6  },
+    { beat_name: 'Midpoint Complication',     beat_type: 'act2',   target_page: 32, position: 7  },
+    { beat_name: 'End of Act Two',            beat_type: 'act2',   target_page: 40, position: 8  },
+    { beat_name: 'Climax',                    beat_type: 'act3',   target_page: 48, position: 9  },
+    { beat_name: 'Resolution / New Normal',   beat_type: 'act3',   target_page: 55, position: 10 },
+    { beat_name: 'Series Hook / Tag',         beat_type: 'tag',    target_page: 58, position: 11 }
   ]
 
   const beats = format === 'pilot' ? pilotBeats : featureBeats
@@ -189,22 +239,75 @@ function initializeBeatSheet(projectId, format) {
   return getBeatSheet(projectId)
 }
 
+// ─── Chat Sessions ────────────────────────────────────────────────────────────
+
+function getChatSessions(projectId) {
+  return getDb().prepare(
+    'SELECT * FROM chat_sessions WHERE project_id = ? ORDER BY created_at ASC'
+  ).all(projectId)
+}
+
+function createChatSession(projectId, name) {
+  const db = getDb()
+  const count = db.prepare('SELECT count(*) as c FROM chat_sessions WHERE project_id = ?').get(projectId)
+  const sessionName = name || `Chat ${(count?.c || 0) + 1}`
+  const result = db.prepare(
+    'INSERT INTO chat_sessions (project_id, name) VALUES (?, ?)'
+  ).run(projectId, sessionName)
+  return db.prepare('SELECT * FROM chat_sessions WHERE id = ?').get(result.lastInsertRowid)
+}
+
+function renameChatSession(id, name) {
+  getDb().prepare(
+    'UPDATE chat_sessions SET name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
+  ).run(name, id)
+  return getDb().prepare('SELECT * FROM chat_sessions WHERE id = ?').get(id)
+}
+
+function deleteChatSession(id) {
+  const db = getDb()
+  db.prepare('DELETE FROM chat_history WHERE chat_session_id = ?').run(id)
+  return db.prepare('DELETE FROM chat_sessions WHERE id = ?').run(id)
+}
+
 // ─── Chat ─────────────────────────────────────────────────────────────────────
 
-function getChatHistory(projectId, context = 'chat') {
-  return getDb().prepare('SELECT * FROM chat_history WHERE project_id = ? AND context = ? ORDER BY created_at').all(projectId, context)
+function getChatHistory(projectId, context = 'chat', sessionId = null) {
+  if (sessionId) {
+    return getDb().prepare(
+      'SELECT * FROM chat_history WHERE project_id = ? AND context = ? AND chat_session_id = ? ORDER BY created_at'
+    ).all(projectId, context, sessionId)
+  }
+  return getDb().prepare(
+    'SELECT * FROM chat_history WHERE project_id = ? AND context = ? ORDER BY created_at'
+  ).all(projectId, context)
 }
 
 function addChatMessage(data) {
   const result = getDb().prepare(`
-    INSERT INTO chat_history (project_id, role, content, model, tokens_used, context)
-    VALUES (@project_id, @role, @content, @model, @tokens_used, @context)
-  `).run({ project_id: data.project_id, role: data.role, content: data.content, model: data.model || null, tokens_used: data.tokens_used || 0, context: data.context || 'chat' })
+    INSERT INTO chat_history (project_id, role, content, model, tokens_used, context, chat_session_id)
+    VALUES (@project_id, @role, @content, @model, @tokens_used, @context, @chat_session_id)
+  `).run({
+    project_id:      data.project_id,
+    role:            data.role,
+    content:         data.content,
+    model:           data.model || null,
+    tokens_used:     data.tokens_used || 0,
+    context:         data.context || 'chat',
+    chat_session_id: data.chat_session_id || null
+  })
   return getDb().prepare('SELECT * FROM chat_history WHERE id = ?').get(result.lastInsertRowid)
 }
 
-function clearChatHistory(projectId, context = 'chat') {
-  return getDb().prepare('DELETE FROM chat_history WHERE project_id = ? AND context = ?').run(projectId, context)
+function clearChatHistory(projectId, context = 'chat', sessionId = null) {
+  if (sessionId) {
+    return getDb().prepare(
+      'DELETE FROM chat_history WHERE project_id = ? AND context = ? AND chat_session_id = ?'
+    ).run(projectId, context, sessionId)
+  }
+  return getDb().prepare(
+    'DELETE FROM chat_history WHERE project_id = ? AND context = ?'
+  ).run(projectId, context)
 }
 
 // ─── Brainstorm ───────────────────────────────────────────────────────────────
@@ -212,22 +315,10 @@ function clearChatHistory(projectId, context = 'chat') {
 function ensureBrainstormEntryColumns() {
   const db = getDb()
   const columns = db.prepare('PRAGMA table_info(brainstorm_entries)').all().map(col => col.name)
-
-  if (!columns.includes('position_x')) {
-    db.prepare('ALTER TABLE brainstorm_entries ADD COLUMN position_x REAL DEFAULT 0').run()
-  }
-
-  if (!columns.includes('position_y')) {
-    db.prepare('ALTER TABLE brainstorm_entries ADD COLUMN position_y REAL DEFAULT 0').run()
-  }
-
-  if (!columns.includes('status')) {
-    db.prepare("ALTER TABLE brainstorm_entries ADD COLUMN status TEXT DEFAULT 'active'").run()
-  }
-
-  if (!columns.includes('resolved_at')) {
-    db.prepare('ALTER TABLE brainstorm_entries ADD COLUMN resolved_at DATETIME').run()
-  }
+  if (!columns.includes('position_x'))  db.prepare('ALTER TABLE brainstorm_entries ADD COLUMN position_x REAL DEFAULT 0').run()
+  if (!columns.includes('position_y'))  db.prepare('ALTER TABLE brainstorm_entries ADD COLUMN position_y REAL DEFAULT 0').run()
+  if (!columns.includes('status'))      db.prepare("ALTER TABLE brainstorm_entries ADD COLUMN status TEXT DEFAULT 'active'").run()
+  if (!columns.includes('resolved_at')) db.prepare('ALTER TABLE brainstorm_entries ADD COLUMN resolved_at DATETIME').run()
 }
 
 function getBrainstormEntries(projectId) {
@@ -254,17 +345,14 @@ function deleteBrainstormEntry(id) {
 
 function createSnapshot(projectId, label, type = 'manual') {
   const db = getDb()
-  const project = getProject(projectId)
-  const documents = getDocuments(projectId)
-  const characters = getCharacters(projectId)
+  const project      = getProject(projectId)
+  const documents    = getDocuments(projectId)
+  const characters   = getCharacters(projectId)
   const worldBuilding = getWorldBuilding(projectId)
-  const beatSheet = getBeatSheet(projectId)
-  const research = getResearch(projectId)
-
+  const beatSheet    = getBeatSheet(projectId)
+  const research     = getResearch(projectId)
   const data = JSON.stringify({ project, documents, characters, worldBuilding, beatSheet, research, timestamp: new Date().toISOString() })
   const result = db.prepare('INSERT INTO snapshots (project_id, label, snapshot_type, data) VALUES (?, ?, ?, ?)').run(projectId, label, type, data)
-
-  // Thin old daily snapshots (keep 30, then weekly)
   thinSnapshots(projectId)
   return db.prepare('SELECT id, project_id, label, snapshot_type, created_at FROM snapshots WHERE id = ?').get(result.lastInsertRowid)
 }
@@ -273,8 +361,7 @@ function thinSnapshots(projectId) {
   const db = getDb()
   const dailySnapshots = db.prepare("SELECT id FROM snapshots WHERE project_id = ? AND snapshot_type = 'daily' ORDER BY created_at DESC").all(projectId)
   if (dailySnapshots.length > 30) {
-    const toDelete = dailySnapshots.slice(30)
-    toDelete.forEach(s => db.prepare('DELETE FROM snapshots WHERE id = ?').run(s.id))
+    dailySnapshots.slice(30).forEach(s => db.prepare('DELETE FROM snapshots WHERE id = ?').run(s.id))
   }
 }
 
@@ -291,16 +378,12 @@ function restoreSnapshot(snapshotId) {
   const snapshot = getSnapshot(snapshotId)
   if (!snapshot) throw new Error('Snapshot not found')
   const data = JSON.parse(snapshot.data)
-
   db.prepare('UPDATE projects SET title=@title, format=@format, genre=@genre, tone=@tone, logline=@logline, premise=@premise, target_audience=@target_audience, comparable_titles=@comparable_titles, updated_at=CURRENT_TIMESTAMP WHERE id=@id').run(data.project)
-
-  // Restore documents
   if (data.documents) {
     data.documents.forEach(doc => {
       db.prepare('UPDATE documents SET content=@content, title=@title, updated_at=CURRENT_TIMESTAMP WHERE id=@id').run(doc)
     })
   }
-
   return { success: true }
 }
 
@@ -362,16 +445,16 @@ function getTokenUsage(projectId) {
 
 function getFullProjectData(projectId) {
   return {
-    project: getProject(projectId),
-    documents: getDocuments(projectId),
-    characters: getCharacters(projectId),
+    project:      getProject(projectId),
+    documents:    getDocuments(projectId),
+    characters:   getCharacters(projectId),
     worldBuilding: getWorldBuilding(projectId),
-    beatSheet: getBeatSheet(projectId),
-    brainstorm: getBrainstormEntries(projectId),
-    research: getResearch(projectId),
-    chatHistory: getChatHistory(projectId),
-    snapshots: getSnapshots(projectId),
-    sessions: getSessionHistory(projectId)
+    beatSheet:    getBeatSheet(projectId),
+    brainstorm:   getBrainstormEntries(projectId),
+    research:     getResearch(projectId),
+    chatHistory:  getChatHistory(projectId),
+    snapshots:    getSnapshots(projectId),
+    sessions:     getSessionHistory(projectId)
   }
 }
 
@@ -382,6 +465,7 @@ module.exports = {
   getCharacters, upsertCharacter, deleteCharacter,
   getWorldBuilding, upsertWorldBuilding, deleteWorldBuilding,
   getBeatSheet, upsertBeat, initializeBeatSheet,
+  getChatSessions, createChatSession, renameChatSession, deleteChatSession,
   getChatHistory, addChatMessage, clearChatHistory,
   getBrainstormEntries, addBrainstormEntry, updateBrainstormEntry, deleteBrainstormEntry,
   createSnapshot, getSnapshots, getSnapshot, restoreSnapshot,

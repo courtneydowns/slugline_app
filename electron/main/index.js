@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, globalShortcut, Menu, dialog, shell } = require('electron')
 const path = require('path')
 const { is } = require('@electron-toolkit/utils')
+const { registerChatSessionHandlers } = require('./ipc-chat-sessions')
 
 let mainWindow = null
 let currentProjectId = null
@@ -164,8 +165,9 @@ ipcMain.handle('beats:upsert', (e, data) => db.upsertBeat(data))
 ipcMain.handle('beats:init', (e, { projectId, format }) => db.initializeBeatSheet(projectId, format))
 
 // Chat
-ipcMain.handle('chat:get-history', (e, { projectId, context }) => db.getChatHistory(projectId, context))
-ipcMain.handle('chat:clear', (e, { projectId, context }) => db.clearChatHistory(projectId, context))
+ipcMain.handle('chat:get-history', (e, { projectId, context, sessionId }) => db.getChatHistory(projectId, context, sessionId))
+ipcMain.handle('chat:clear', (e, { projectId, context, sessionId }) => db.clearChatHistory(projectId, context, sessionId))
+registerChatSessionHandlers(ipcMain)
 
 // Brainstorm
 ipcMain.handle('brainstorm:get-all', (e, projectId) => db.getBrainstormEntries(projectId))

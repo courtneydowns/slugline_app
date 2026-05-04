@@ -48,29 +48,41 @@ const useStore = create((set, get) => ({
       worldBuildingResult,
       beatsResult,
       researchResult,
-      chatHistoryResult,
       brainstormResult
     ] = await Promise.allSettled([
       window.api.getCharacters(projectId),
       window.api.getWorldBuilding(projectId),
       window.api.getBeats(projectId),
       window.api.getResearch(projectId),
-      window.api.getChatHistory(projectId, 'chat'),
       window.api.getBrainstormEntries(projectId)
     ])
 
     set({
-      characters:   charactersResult.status   === 'fulfilled' ? charactersResult.value   : [],
+      characters:    charactersResult.status    === 'fulfilled' ? charactersResult.value    : [],
       worldBuilding: worldBuildingResult.status === 'fulfilled' ? worldBuildingResult.value : [],
       beats:         beatsResult.status         === 'fulfilled' ? beatsResult.value         : [],
       research:      researchResult.status      === 'fulfilled' ? researchResult.value      : [],
-      chatHistory:   chatHistoryResult.status   === 'fulfilled' ? chatHistoryResult.value   : [],
       brainstorm:    brainstormResult.status    === 'fulfilled' ? brainstormResult.value    : []
     })
 
+    // Load chat sessions then history for the first/active session
+    try {
+      const sessions = await window.api.getChatSessions(projectId)
+      let sessionId = null
+      let chatHistory = []
+      if (sessions.length > 0) {
+        sessionId = sessions[0].id
+        chatHistory = await window.api.getChatHistory(projectId, 'chat', sessionId)
+      }
+      set({ chatSessions: sessions, currentChatSessionId: sessionId, chatHistory })
+    } catch (e) {
+      console.warn('loadProjectData: chat sessions failed:', e)
+      set({ chatSessions: [], currentChatSessionId: null, chatHistory: [] })
+    }
+
     // Log any failures for debugging
-    const names = ['characters', 'worldBuilding', 'beats', 'research', 'chatHistory', 'brainstorm']
-    ;[charactersResult, worldBuildingResult, beatsResult, researchResult, chatHistoryResult, brainstormResult]
+    const names = ['characters', 'worldBuilding', 'beats', 'research', 'brainstorm']
+    ;[charactersResult, worldBuildingResult, beatsResult, researchResult, brainstormResult]
       .forEach((r, i) => { if (r.status === 'rejected') console.warn(`loadProjectData: ${names[i]} failed:`, r.reason) })
   },
 
@@ -95,14 +107,18 @@ const useStore = create((set, get) => ({
   setBrainstorm:    (brainstorm)    => set({ brainstorm }),
 
   // ─── Chat ─────────────────────────────────────────────────────────────────
+  chatSessions: [],
+  currentChatSessionId: null,
   chatHistory: [],
   chatLoading: false,
   streamingContent: '',
 
-  setChatHistory:      (chatHistory) => set({ chatHistory }),
-  setChatLoading:      (v)           => set({ chatLoading: v }),
-  appendStreamChunk:   (chunk)       => set(s => ({ streamingContent: s.streamingContent + chunk })),
-  clearStreamingContent: ()          => set({ streamingContent: '' }),
+  setChatSessions:       (sessions) => set({ chatSessions: sessions }),
+  setCurrentChatSessionId: (id)     => set({ currentChatSessionId: id }),
+  setChatHistory:        (chatHistory) => set({ chatHistory }),
+  setChatLoading:        (v)           => set({ chatLoading: v }),
+  appendStreamChunk:     (chunk)       => set(s => ({ streamingContent: s.streamingContent + chunk })),
+  clearStreamingContent: ()            => set({ streamingContent: '' }),
 
   // ─── UI Layout ─────────────────────────────────────────────────────────────
   layoutMode: 'default',
