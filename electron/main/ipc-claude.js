@@ -3,6 +3,11 @@ const { getApiKey } = require('./config')
 const db = require('./db')
 const { CLAUDE_MODELS, selectClaudeModel, selectMaxTokens } = require('./claude-config')
 
+// ─── Truncation / continuation settings ──────────────────────────────────────
+// Used by both complete() and handleChat() when the API returns stop_reason='max_tokens'.
+const CONTINUATION_PROMPT   = 'Continue exactly where you left off. Do not repeat prior text.'
+const MAX_CONTINUATION_PASSES = 2
+
 function getClient() {
   const key = getApiKey()
   if (!key) throw new Error('No API key configured. Go to Settings to add your Anthropic API key.')
@@ -19,14 +24,53 @@ async function complete({ feature, messages, system, projectId }) {
   const client    = getClient()
   const inputEstimate = estimateTokens((system || '') + messages.map(m => typeof m.content === 'string' ? m.content : JSON.stringify(m.content)).join('\n'))
 
-  const response = await client.messages.create({ model, max_tokens: maxTokens, system: system || undefined, messages })
+  let fullContent    = ''
+  let totalInput     = 0
+  let totalOutput    = 0
+  let wasTruncated   = false
+  let currentMessages = [...messages]
 
-  const inputTokens  = response.usage?.input_tokens  || inputEstimate
-  const outputTokens = response.usage?.output_tokens || 0
+  for (let pass = 0; pass <= MAX_CONTINUATION_PASSES; pass++) {
+    const response = await client.messages.create({
+      model,
+      max_tokens: maxTokens,
+      system: system || undefined,
+      messages: currentMessages
+    })
 
-  if (projectId) db.logTokenUsage({ project_id: projectId, model, feature, input_tokens: inputTokens, output_tokens: outputTokens })
+    const chunk      = response.content[0]?.text || ''
+    const stopReason = response.stop_reason
+    const usage      = response.usage || {}
 
-  return { content: response.content[0]?.text || '', model, usage: { input: inputTokens, output: outputTokens } }
+    fullContent  += chunk
+    totalInput   += usage.input_tokens  || (pass === 0 ? inputEstimate : 0)
+    totalOutput  += usage.output_tokens || 0
+
+    if (stopReason !== 'max_tokens') break   // clean stop — done
+
+    // Truncated: prepare continuation unless we've exhausted passes
+    wasTruncated = true
+    if (pass >= MAX_CONTINUATION_PASSES) break
+
+    // Build continuation: append what the model wrote, then ask it to continue
+    currentMessages = [
+      ...currentMessages,
+      { role: 'assistant', content: chunk },
+      { role: 'user',      content: CONTINUATION_PROMPT }
+    ]
+  }
+
+  if (projectId) db.logTokenUsage({
+    project_id: projectId, model, feature,
+    input_tokens: totalInput, output_tokens: totalOutput
+  })
+
+  return {
+    content:     fullContent,
+    model,
+    wasTruncated,
+    usage: { input: totalInput, output: totalOutput }
+  }
 }
 
 // ─── IPC Handlers ─────────────────────────────────────────────────────────────
@@ -74,23 +118,69 @@ async function handleChat(event, { projectId, message, chatHistory, documentCont
 
   db.addChatMessage({ project_id: projectId, role: 'user', content: message, context: 'chat', chat_session_id: chatSessionId || null })
 
-  let fullContent = ''
+  let fullContent  = ''
+  let totalInput   = 0
+  let totalOutput  = 0
 
-  try {
-    const stream = client.messages.stream({ model, max_tokens: selectMaxTokens('chat'), system: systemPrompt, messages })
+  // ── Streaming pass — with automatic continuation on max_tokens ────────────
+  async function streamPass(passMessages, passNumber) {
+    const stream = client.messages.stream({
+      model,
+      max_tokens: selectMaxTokens('chat'),
+      system: systemPrompt,
+      messages: passMessages
+    })
 
     stream.on('text', (text) => {
       fullContent += text
-      event.sender.send('claude:stream-chunk', { chunk: text })
+      event.sender.send('claude:stream-chunk', {
+        projectId,
+        chatSessionId: chatSessionId || null,
+        chunk: text
+      })
     })
 
-    const finalMsg = await stream.finalMessage()
-    const usage    = finalMsg.usage
+    const finalMsg   = await stream.finalMessage()
+    const usage      = finalMsg.usage || {}
+    const stopReason = finalMsg.stop_reason
 
-    db.addChatMessage({ project_id: projectId, role: 'assistant', content: fullContent, model, tokens_used: usage?.output_tokens || 0, context: 'chat', chat_session_id: chatSessionId || null })
-    db.logTokenUsage({ project_id: projectId, model, feature: 'chat', input_tokens: usage?.input_tokens || 0, output_tokens: usage?.output_tokens || 0 })
+    totalInput  += usage.input_tokens  || 0
+    totalOutput += usage.output_tokens || 0
 
-    return { content: fullContent, model, usage }
+    if (stopReason === 'max_tokens' && passNumber < MAX_CONTINUATION_PASSES) {
+      // Notify the renderer a continuation is starting
+      event.sender.send('claude:stream-chunk', {
+        projectId,
+        chatSessionId: chatSessionId || null,
+        chunk: '\n\n[Response reached output limit — continuing…]\n\n'
+      })
+
+      // Build continuation turn
+      const continuationMessages = [
+        ...passMessages,
+        { role: 'assistant', content: finalMsg.content[0]?.text || '' },
+        { role: 'user',      content: CONTINUATION_PROMPT }
+      ]
+      await streamPass(continuationMessages, passNumber + 1)
+    } else if (passNumber >= MAX_CONTINUATION_PASSES) {
+      // Final automatic continuation pass completed.
+      // Even if the API reports a clean stop, show the user how to keep going.
+      event.sender.send('claude:stream-chunk', {
+        projectId,
+        chatSessionId: chatSessionId || null,
+        chunk: '\n\n[Automatic continuation limit reached. Send “continue” and I’ll pick up exactly where I left off.]\n\n'
+      })
+    }
+    // else: clean stop — done
+  }
+
+  try {
+    await streamPass(messages, 0)
+
+    db.addChatMessage({ project_id: projectId, role: 'assistant', content: fullContent, model, tokens_used: totalOutput, context: 'chat', chat_session_id: chatSessionId || null })
+    db.logTokenUsage({ project_id: projectId, model, feature: 'chat', input_tokens: totalInput, output_tokens: totalOutput })
+
+    return { content: fullContent, model, usage: { input_tokens: totalInput, output_tokens: totalOutput } }
   } catch (err) {
     if (fullContent) {
       db.addChatMessage({ project_id: projectId, role: 'assistant', content: fullContent, model, context: 'chat', chat_session_id: chatSessionId || null })

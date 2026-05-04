@@ -22,14 +22,21 @@ export default function ChatPanel() {
   const bottomRef  = useRef()
   const inputRef   = useRef()
   const renameRef  = useRef()
+  const activeStreamRef = useRef(null)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [chatHistory, streaming])
 
-  // Listen for stream chunks
+  // Listen for stream chunks, but only append chunks for the request/session
+  // that this ChatPanel launched. This prevents another chat tab/session from
+  // visually overwriting the currently selected chat while a response streams.
   useEffect(() => {
-    const cleanup = window.api.onMenu('claude:stream-chunk', ({ chunk }) => {
+    const cleanup = window.api.onMenu('claude:stream-chunk', ({ projectId, chatSessionId, chunk }) => {
+      const active = activeStreamRef.current
+      if (!active) return
+      if (projectId !== active.projectId) return
+      if (chatSessionId !== active.chatSessionId) return
       setStreaming(s => s + chunk)
     })
     return cleanup
@@ -119,25 +126,38 @@ export default function ChatPanel() {
     e.preventDefault()
     if (!input.trim() || loading || !currentProject || !currentChatSessionId) return
     const message = input.trim()
+    const sendProjectId = currentProject.id
+    const sendSessionId = currentChatSessionId
+
     setInput('')
     setLoading(true)
     setStreaming('')
+    activeStreamRef.current = {
+      projectId: sendProjectId,
+      chatSessionId: sendSessionId
+    }
 
     const context = currentDocument?.content?.slice(-500) || ''
 
     try {
       await window.api.claudeChat({
-        projectId:       currentProject.id,
+        projectId:       sendProjectId,
         message,
         chatHistory:     chatHistory.slice(-10),
         documentContext: context,
-        chatSessionId:   currentChatSessionId
+        chatSessionId:   sendSessionId
       })
-      const updated = await window.api.getChatHistory(currentProject.id, 'chat', currentChatSessionId)
-      setChatHistory(updated)
+
+      // Only replace the visible history if the user is still looking at the
+      // same chat session that launched this request.
+      if (useStore.getState().currentChatSessionId === sendSessionId) {
+        const updated = await window.api.getChatHistory(sendProjectId, 'chat', sendSessionId)
+        setChatHistory(updated)
+      }
     } catch (err) {
       addNotification('Chat error: ' + err.message, 'error')
     }
+    activeStreamRef.current = null
     setStreaming('')
     setLoading(false)
   }
