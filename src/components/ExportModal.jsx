@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import useStore from '../store'
 
 const FORMATS = [
@@ -13,6 +13,14 @@ export default function ExportModal({ onClose }) {
   const { currentProject, currentDocument, addNotification } = useStore()
   const [format, setFormat] = useState('fountain')
   const [exporting, setExporting] = useState(false)
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onClose])
 
   async function handleExport() {
     if (!currentDocument) { addNotification('No document to export', 'warning'); return }
@@ -49,10 +57,19 @@ export default function ExportModal({ onClose }) {
   }
 
   return (
-    <div className="modal-overlay">
-      <div className="modal" style={{ width: 480 }}>
-        <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)' }}>
+    <div className="modal-overlay" onMouseDown={onClose}>
+      <div className="modal" style={{ width: 480, maxHeight: '88vh', overflow: 'auto' }} onMouseDown={e => e.stopPropagation()}>
+        <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
           <div style={{ fontFamily: 'var(--font-display)', fontSize: 18, color: 'var(--amber)' }}>Export / Import</div>
+          <button
+            className="btn btn-ghost"
+            onClick={onClose}
+            title="Close Export"
+            aria-label="Close Export"
+            style={{ minWidth: 36, height: 32, padding: '0 10px', fontSize: 18, lineHeight: 1 }}
+          >
+            ×
+          </button>
         </div>
 
         <div style={{ padding: 24 }}>
