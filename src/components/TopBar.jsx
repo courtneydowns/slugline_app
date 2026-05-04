@@ -39,13 +39,24 @@ export default function TopBar({ onPanic }) {
   const [commandQuery, setCommandQuery] = useState('')
   const commandRef = useRef(null)
   const inputRef = useRef(null)
+  const saveResetTimer = useRef(null)
 
   // Listen for autosave events from the editor
   useEffect(() => {
     const handler = (e) => {
-      if (e.detail === 'saving') setSaveIndicator('saving')
+      if (saveResetTimer.current) clearTimeout(saveResetTimer.current)
+
+      if (e.detail === 'saving') {
+        setSaveIndicator('saving')
+        saveResetTimer.current = setTimeout(() => {
+          setSaveIndicator('saved')
+        }, 2600)
+      }
+
       if (e.detail === 'saved') {
-        setSaveIndicator('saved')
+        saveResetTimer.current = setTimeout(() => {
+          setSaveIndicator('saved')
+        }, 700)
       }
     }
     window.addEventListener('slugline:save', handler)

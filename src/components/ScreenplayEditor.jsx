@@ -95,13 +95,20 @@ export default function ScreenplayEditor() {
   useEffect(() => {
     if (!currentDocument) return
     if (saveTimer.current) clearTimeout(saveTimer.current)
+    window.dispatchEvent(new CustomEvent('slugline:save', { detail: 'saving' }))
     saveTimer.current = setTimeout(async () => {
       const content = blocksToFountain(blocks)
-      await saveDocument(content)
-      setSavedAt(new Date())
-      // Update page count estimate
-      const lines = content.split('\n').filter(l => l.trim()).length
-      setPageCount(Math.max(1, Math.round(lines / 55 * 10) / 10))
+      try {
+        await saveDocument(content)
+        setSavedAt(new Date())
+        window.dispatchEvent(new CustomEvent('slugline:save', { detail: 'saved' }))
+        // Update page count estimate
+        const lines = content.split('\n').filter(l => l.trim()).length
+        setPageCount(Math.max(1, Math.round(lines / 55 * 10) / 10))
+      } catch (error) {
+        window.dispatchEvent(new CustomEvent('slugline:save', { detail: 'saved' }))
+        throw error
+      }
     }, 1500)
     return () => clearTimeout(saveTimer.current)
   }, [blocks])
@@ -141,6 +148,7 @@ export default function ScreenplayEditor() {
 
   function updateBlock(id, text) {
     resetPromptTimer()
+    window.dispatchEvent(new CustomEvent('slugline:save', { detail: 'saving' }))
     const detected = detectType(text)
     setBlocks(bs => bs.map(b => {
       if (b.id !== id) return b
