@@ -74,11 +74,32 @@ html, body, #root {
   font-size: 14px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
-  user-select: none;
 }
 
-/* Allow text selection in editor and inputs */
-.selectable, textarea, input, [contenteditable] { user-select: text; }
+/* Allow normal text selection throughout app content */
+body {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* Keep interactive chrome from accidentally selecting */
+button,
+.btn,
+.nav-item,
+.nav-rail-item,
+.nav-rail-panic,
+.command-item,
+.topbar,
+.drag-region {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Explicitly preserve text selection in editor and inputs */
+.selectable, textarea, input, [contenteditable] {
+  user-select: text;
+  -webkit-user-select: text;
+}
 
 /* Scrollbars */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -301,7 +322,6 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
   align-items: center;
   justify-content: space-between;
   flex-shrink: 0;
-  -webkit-app-region: drag;
   padding-top: 48px;
 }
 
@@ -950,12 +970,30 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
   text-align: left;
   font-family: var(--font-ui);
   border-left: 3px solid var(--card-accent, var(--amber));
+  user-select: text;
+  -webkit-user-select: text;
 }
 .workspace-card:hover {
   background: var(--bg-raised);
   border-color: var(--card-accent, var(--amber));
   transform: translateY(-1px);
   box-shadow: var(--shadow);
+}
+
+.workspace-card:focus-visible {
+  outline: 2px solid var(--card-accent, var(--amber));
+  outline-offset: 2px;
+}
+
+.workspace-card-icon {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.workspace-card-label,
+.workspace-card-desc {
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .workspace-card-icon {

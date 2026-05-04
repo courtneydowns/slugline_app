@@ -209,11 +209,34 @@ function clearChatHistory(projectId, context = 'chat') {
 
 // ─── Brainstorm ───────────────────────────────────────────────────────────────
 
+function ensureBrainstormEntryColumns() {
+  const db = getDb()
+  const columns = db.prepare('PRAGMA table_info(brainstorm_entries)').all().map(col => col.name)
+
+  if (!columns.includes('position_x')) {
+    db.prepare('ALTER TABLE brainstorm_entries ADD COLUMN position_x REAL DEFAULT 0').run()
+  }
+
+  if (!columns.includes('position_y')) {
+    db.prepare('ALTER TABLE brainstorm_entries ADD COLUMN position_y REAL DEFAULT 0').run()
+  }
+
+  if (!columns.includes('status')) {
+    db.prepare("ALTER TABLE brainstorm_entries ADD COLUMN status TEXT DEFAULT 'active'").run()
+  }
+
+  if (!columns.includes('resolved_at')) {
+    db.prepare('ALTER TABLE brainstorm_entries ADD COLUMN resolved_at DATETIME').run()
+  }
+}
+
 function getBrainstormEntries(projectId) {
+  ensureBrainstormEntryColumns()
   return getDb().prepare('SELECT * FROM brainstorm_entries WHERE project_id = ? ORDER BY created_at').all(projectId)
 }
 
 function addBrainstormEntry(data) {
+  ensureBrainstormEntryColumns()
   const result = getDb().prepare('INSERT INTO brainstorm_entries (project_id, content, category, position_x, position_y) VALUES (?, ?, ?, ?, ?)').run(data.project_id, data.content, data.category || 'idea', data.position_x || 0, data.position_y || 0)
   return getDb().prepare('SELECT * FROM brainstorm_entries WHERE id = ?').get(result.lastInsertRowid)
 }

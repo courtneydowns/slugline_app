@@ -1,17 +1,35 @@
 import React, { useMemo } from 'react'
 import useStore from '../store'
 
-const WorkspaceCard = ({ icon, label, description, onClick, accent }) => (
-  <button
-    className="workspace-card no-drag"
-    onClick={onClick}
-    style={{ '--card-accent': accent || 'var(--amber)' }}
-  >
-    <div className="workspace-card-icon">{icon}</div>
-    <div className="workspace-card-label">{label}</div>
-    {description && <div className="workspace-card-desc">{description}</div>}
-  </button>
-)
+const WorkspaceCard = ({ icon, label, description, onClick, accent }) => {
+  const handleClick = () => {
+    const selection = window.getSelection?.()
+    if (selection && !selection.isCollapsed) return
+    onClick?.()
+  }
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      onClick?.()
+    }
+  }
+
+  return (
+    <div
+      className="workspace-card no-drag"
+      role="button"
+      tabIndex={0}
+      onClick={handleClick}
+      onKeyDown={handleKeyDown}
+      style={{ '--card-accent': accent || 'var(--amber)' }}
+    >
+      <div className="workspace-card-icon">{icon}</div>
+      <div className="workspace-card-label">{label}</div>
+      {description && <div className="workspace-card-desc">{description}</div>}
+    </div>
+  )
+}
 
 export default function Dashboard() {
   const {
