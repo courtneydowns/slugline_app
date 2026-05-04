@@ -73,6 +73,7 @@ export default function ScreenplayEditor() {
   const { currentDocument, currentProject, saveDocument, addNotification, layoutMode, suggestions, setSuggestions } = useStore()
   const [blocks, setBlocks] = useState([{ id: Date.now(), type: 'action', text: '' }])
   const [focusedId, setFocusedId] = useState(null)
+  const [selectedBlockIds, setSelectedBlockIds] = useState([])
   const [savedAt, setSavedAt] = useState(null)
   const [writingPrompt, setWritingPrompt] = useState('')
   const [promptTimeout, setPromptTimeout] = useState(null)
@@ -156,8 +157,79 @@ export default function ScreenplayEditor() {
     }))
   }
 
+  function selectBlockRange(fromId, toId) {
+    const fromIndex = blocks.findIndex(b => b.id === fromId)
+    const toIndex = blocks.findIndex(b => b.id === toId)
+    if (fromIndex === -1 || toIndex === -1) return
+    const start = Math.min(fromIndex, toIndex)
+    const end = Math.max(fromIndex, toIndex)
+    setSelectedBlockIds(blocks.slice(start, end + 1).map(b => b.id))
+  }
+
+  function handleBlockSelect(e, block) {
+    if (e.shiftKey && focusedId) {
+      e.preventDefault()
+      selectBlockRange(focusedId, block.id)
+      setFocusedId(block.id)
+      refs.current[block.id]?.focus()
+      return
+    }
+
+    if (e.metaKey || e.ctrlKey) {
+      e.preventDefault()
+      setSelectedBlockIds(ids => (
+        ids.includes(block.id)
+          ? ids.filter(id => id !== block.id)
+          : [...ids, block.id]
+      ))
+      setFocusedId(block.id)
+      refs.current[block.id]?.focus()
+      return
+    }
+
+    setSelectedBlockIds([])
+  }
+
+  function deleteSelectedBlocks(fallbackBlock, fallbackIndex) {
+    const selectedIds = selectedBlockIds.filter(id => blocks.some(b => b.id === id))
+    if (selectedIds.length === 0) return false
+
+    const selectedSet = new Set(selectedIds)
+    const firstSelectedIndex = blocks.findIndex(b => selectedSet.has(b.id))
+    const remaining = blocks.filter(b => !selectedSet.has(b.id))
+    const nextBlocks = remaining.length > 0
+      ? remaining
+      : [{ id: Date.now() + Math.random(), type: fallbackBlock?.type || 'action', text: '' }]
+
+    const nextFocusIndex = Math.min(Math.max(firstSelectedIndex, 0), nextBlocks.length - 1)
+    const nextFocus = nextBlocks[nextFocusIndex]
+
+    resetPromptTimer()
+    window.dispatchEvent(new CustomEvent('slugline:save', { detail: 'saving' }))
+    setBlocks(nextBlocks)
+    setSelectedBlockIds([])
+
+    setTimeout(() => {
+      const el = refs.current[nextFocus.id]
+      if (el) {
+        el.focus()
+        el.setSelectionRange(0, 0)
+        setFocusedId(nextFocus.id)
+      }
+    }, 0)
+
+    return true
+  }
+
   function handleKeyDown(e, block, index) {
     const el = refs.current[block.id]
+
+    // Delete/Backspace — remove selected screenplay blocks
+    if ((e.key === 'Delete' || e.key === 'Backspace') && selectedBlockIds.length > 0) {
+      e.preventDefault()
+      deleteSelectedBlocks(block, index)
+      return
+    }
 
     // Tab — cycle element type
     if (e.key === 'Tab') {
@@ -307,8 +379,10 @@ export default function ScreenplayEditor() {
                 key={block.id}
                 block={block}
                 focused={focusedId === block.id}
+                selected={selectedBlockIds.includes(block.id)}
                 inputRef={el => refs.current[block.id] = el}
                 onFocus={() => setFocusedId(block.id)}
+                onMouseDown={e => handleBlockSelect(e, block)}
                 onChange={text => updateBlock(block.id, text)}
                 onKeyDown={e => handleKeyDown(e, block, index)}
               />
@@ -349,7 +423,7 @@ export default function ScreenplayEditor() {
   )
 }
 
-function BlockLine({ block, focused, inputRef, onFocus, onChange, onKeyDown }) {
+function BlockLine({ block, focused, selected, inputRef, onFocus, onMouseDown, onChange, onKeyDown }) {
   const styleMap = {
     'scene-heading': { textTransform: 'uppercase', fontWeight: 'bold', marginTop: '2em', color: 'var(--text-primary)' },
     'action': { marginBottom: '0.5em' },
@@ -361,10 +435,19 @@ function BlockLine({ block, focused, inputRef, onFocus, onChange, onKeyDown }) {
   }
 
   return (
-    <div style={{ position: 'relative', ...styleMap[block.type] }}>
+    <div
+      onMouseDown={onMouseDown}
+      style={{
+        position: 'relative',
+        borderRadius: 4,
+        outline: selected ? '1px solid var(--amber)' : '1px solid transparent',
+        background: selected ? 'var(--amber-subtle)' : 'transparent',
+        ...styleMap[block.type]
+      }}
+    >
       <span
         className="element-badge"
-        style={{ opacity: focused ? 1 : 0, transition: 'opacity 0.15s' }}
+        style={{ opacity: focused || selected ? 1 : 0, transition: 'opacity 0.15s' }}
       >
         {ELEMENT_LABELS[block.type]}
       </span>
