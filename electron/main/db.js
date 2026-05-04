@@ -115,11 +115,26 @@ function getDocument(id) {
 }
 
 function createDocument(data) {
+  const content = data.content || ''
+  const words = content.split(/\s+/).filter(Boolean).length
+  const pages = Math.round((content.split('\n').length / 55) * 10) / 10
+
   const result = getDb().prepare(`
-    INSERT INTO documents (project_id, title, content)
-    VALUES (@project_id, @title, @content)
-  `).run({ project_id: data.project_id, title: data.title || 'Untitled', content: data.content || '' })
+    INSERT INTO documents (project_id, title, content, word_count, page_count)
+    VALUES (@project_id, @title, @content, @word_count, @page_count)
+  `).run({
+    project_id: data.project_id,
+    title: data.title || 'Untitled',
+    content,
+    word_count: words,
+    page_count: pages
+  })
+
   return getDocument(result.lastInsertRowid)
+}
+
+function deleteDocument(id) {
+  return getDb().prepare('DELETE FROM documents WHERE id = ?').run(id)
 }
 
 function updateDocument(id, data) {
@@ -461,7 +476,7 @@ function getFullProjectData(projectId) {
 module.exports = {
   getDb,
   getAllProjects, getProject, createProject, updateProject, deleteProject,
-  getDocuments, getDocument, createDocument, updateDocument,
+  getDocuments, getDocument, createDocument, updateDocument, deleteDocument,
   getCharacters, upsertCharacter, deleteCharacter,
   getWorldBuilding, upsertWorldBuilding, deleteWorldBuilding,
   getBeatSheet, upsertBeat, initializeBeatSheet,

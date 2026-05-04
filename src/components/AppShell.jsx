@@ -18,6 +18,7 @@ import SnapshotModal from './SnapshotModal'
 import CameraLibrary from './CameraLibrary'
 import ReadThroughMode from './ReadThroughMode'
 import TokenPreview from './TokenPreview'
+import DocumentsWorkspace from './DocumentsWorkspace'
 
 export default function AppShell() {
   const {
@@ -86,6 +87,13 @@ export default function AppShell() {
                 <StoryBible />
               </div>
             )}
+          </div>
+        )
+
+      case 'documents':
+        return (
+          <div className="workspace-fullpage">
+            <DocumentsWorkspace onClose={() => setActiveWorkspace('dashboard')} />
           </div>
         )
 

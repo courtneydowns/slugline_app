@@ -148,6 +148,7 @@ ipcMain.handle('documents:get-all', (e, projectId) => db.getDocuments(projectId)
 ipcMain.handle('documents:get', (e, id) => db.getDocument(id))
 ipcMain.handle('documents:create', (e, data) => db.createDocument(data))
 ipcMain.handle('documents:update', (e, { id, data }) => db.updateDocument(id, data))
+ipcMain.handle('documents:delete', (e, id) => db.deleteDocument(id))
 
 // Characters
 ipcMain.handle('characters:get-all', (e, projectId) => db.getCharacters(projectId))

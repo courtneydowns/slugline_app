@@ -33,7 +33,7 @@ const WorkspaceCard = ({ icon, label, description, onClick, accent }) => {
 
 export default function Dashboard() {
   const {
-    currentProject, currentDocument, documents,
+    currentProject, currentDocument,
     characters, worldBuilding, beats, brainstorm,
     lastWorkspace,
     setActiveWorkspace,

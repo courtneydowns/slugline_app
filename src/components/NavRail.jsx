@@ -4,6 +4,7 @@ import useStore from '../store'
 const NAV_ITEMS = [
   { id: 'dashboard', icon: '⌂', label: 'Dashboard' },
   { id: 'editor', icon: '✏', label: 'Screenplay' },
+  { id: 'documents', icon: '▤', label: 'Documents' },
   { id: 'beatsheet', icon: '📊', label: 'Beat Sheet' },
   { id: 'storybible', icon: '📚', label: 'Story Bible' },
   { id: 'brainstorm', icon: '💡', label: 'Brainstorm' },

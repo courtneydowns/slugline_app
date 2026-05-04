@@ -11,7 +11,8 @@ export default function ChatPanel() {
     setChatSessions,
     currentChatSessionId,
     setCurrentChatSessionId,
-    addNotification
+    addNotification,
+    setDocuments
   } = useStore()
 
   const [input, setInput]       = useState('')
@@ -127,6 +128,73 @@ export default function ChatPanel() {
     setChatHistory([])
   }
 
+  async function handleSaveChat() {
+    if (!currentProject || !currentChatSessionId) return
+
+    const messagesToSave = [
+      ...chatHistory,
+      ...(streaming ? [{ role: 'assistant', content: streaming }] : [])
+    ]
+
+    if (messagesToSave.length === 0) {
+      addNotification('No chat messages to save.', 'warning')
+      return
+    }
+
+    const session = chatSessions.find(s => s.id === currentChatSessionId)
+    const sessionName = session?.name || `Chat ${currentChatSessionId}`
+    const now = new Date()
+    const centralParts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Chicago',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    }).formatToParts(now).reduce((acc, part) => {
+      acc[part.type] = part.value
+      return acc
+    }, {})
+    const exportStamp = `${centralParts.year}-${centralParts.month}-${centralParts.day} ${centralParts.hour}-${centralParts.minute}`
+    const timeStamp = new Intl.DateTimeFormat(undefined, {
+      timeZone: 'America/Chicago',
+      dateStyle: 'medium',
+      timeStyle: 'short'
+    }).format(now)
+    const exportTitle = `Chat Export — ${sessionName} — ${exportStamp}`
+
+    const transcript = [
+      `# ${exportTitle}`,
+      '',
+      `Project: ${currentProject.title || currentProject.name || 'Untitled Project'}`,
+      `Chat: ${sessionName}`,
+      `Exported: ${timeStamp}`,
+      '',
+      '---',
+      '',
+      ...messagesToSave.map(msg => {
+        const label = msg.role === 'user' ? 'User' : 'Assistant'
+        return `## ${label}\n\n${msg.content || ''}`.trim()
+      })
+    ].join('\n\n')
+
+    try {
+      await window.api.createDocument({
+        project_id: currentProject.id,
+        title: exportTitle,
+        content: transcript
+      })
+
+      const docs = await window.api.getAllDocuments(currentProject.id)
+      setDocuments(docs)
+
+      addNotification('Saved chat to Documents.', 'success')
+    } catch (err) {
+      addNotification('Could not save chat: ' + err.message, 'error')
+    }
+  }
+
   // ── Send ─────────────────────────────────────────────────────────────────
 
   async function handleSend(e) {
@@ -197,6 +265,7 @@ export default function ChatPanel() {
   ]
 
   const noSession = !currentChatSessionId
+  const hasMessagesToSave = !noSession && (chatHistory.length > 0 || !!streaming)
   const activeStream = activeStreamRef.current
   const canStopVisibleStream = loading &&
     activeStream &&
@@ -325,6 +394,15 @@ export default function ChatPanel() {
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>Sonnet</span>
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={handleSaveChat}
+            disabled={!hasMessagesToSave}
+            style={{ fontSize: 11, opacity: hasMessagesToSave ? 1 : 0.4 }}
+            title="Save this chat as a project document"
+          >
+            Save Chat
+          </button>
           <button
             className="btn btn-ghost btn-sm"
             onClick={handleClear}

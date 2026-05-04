@@ -18,6 +18,7 @@ contextBridge.exposeInMainWorld('api', {
   getDocument: (id) => ipcRenderer.invoke('documents:get', id),
   createDocument: (data) => ipcRenderer.invoke('documents:create', data),
   updateDocument: (id, data) => ipcRenderer.invoke('documents:update', { id, data }),
+  deleteDocument: (id) => ipcRenderer.invoke('documents:delete', id),
 
   // Characters
   getCharacters: (projectId) => ipcRenderer.invoke('characters:get-all', projectId),

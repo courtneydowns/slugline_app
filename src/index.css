@@ -1189,3 +1189,185 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.5; }
 .dashboard-suggestion {
   padding: 10px 14px;
 }
+
+/* ─── Documents Workspace ─────────────────────────────────────────────────── */
+.documents-workspace {
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  padding: 32px;
+  background: var(--bg-base);
+}
+
+.documents-workspace-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.documents-eyebrow {
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.documents-title {
+  font-size: 32px;
+  line-height: 1.1;
+  color: var(--text-primary);
+  margin: 0 0 8px;
+}
+
+.documents-subtitle {
+  max-width: 680px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.documents-empty {
+  min-height: 320px;
+  border: 1px dashed var(--border-subtle);
+  border-radius: 18px;
+  background: var(--bg-panel);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: center;
+  padding: 32px;
+}
+
+.documents-empty-icon {
+  font-size: 34px;
+  opacity: 0.7;
+}
+
+.documents-empty h2 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 20px;
+}
+
+.documents-empty p {
+  margin: 0;
+  max-width: 440px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.documents-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.documents-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-panel);
+  border-radius: 14px;
+  padding: 10px;
+}
+
+.documents-row--active {
+  border-color: var(--amber);
+  background: rgba(184, 116, 31, 0.10);
+}
+
+.documents-row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 6px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.documents-row-main:hover .documents-row-title {
+  color: var(--amber);
+}
+
+.documents-row-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.documents-row-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.documents-row-title {
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 650;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.documents-row-meta {
+  color: var(--text-muted);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.documents-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.documents-current-pill {
+  color: var(--amber);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.documents-delete-btn {
+  border: 1px solid rgba(200,75,75,0.35);
+  background: rgba(200,75,75,0.08);
+  color: #D46A6A;
+  border-radius: 10px;
+  padding: 7px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.documents-delete-btn:hover:not(:disabled) {
+  background: rgba(200,75,75,0.16);
+}
+
+.documents-delete-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
