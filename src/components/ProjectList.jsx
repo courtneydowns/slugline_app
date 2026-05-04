@@ -6,6 +6,8 @@ export default function ProjectList() {
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [newTitle, setNewTitle] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     loadProjects().then(() => setLoading(false))
@@ -24,11 +26,31 @@ export default function ProjectList() {
     setActiveWorkspace('dashboard')
   }
 
-  async function handleDelete(e, id, title) {
+  function requestDelete(e, project) {
     e.stopPropagation()
-    if (!confirm(`Delete "${title}"? This cannot be undone.`)) return
-    await window.api.deleteProject(id)
-    loadProjects()
+    setDeleteTarget(project)
+  }
+
+  function cancelDelete() {
+    if (deleting) return
+    setDeleteTarget(null)
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget || deleting) return
+
+    setDeleting(true)
+    try {
+      await window.api.deleteProject(deleteTarget.id)
+      addNotification(`Deleted "${deleteTarget.title}"`, 'success')
+      setDeleteTarget(null)
+      await loadProjects()
+    } catch (err) {
+      console.error('Failed to delete project:', err)
+      addNotification(`Could not delete project: ${err.message || err}`, 'error')
+    } finally {
+      setDeleting(false)
+    }
   }
 
   if (loading) return (
@@ -117,7 +139,7 @@ export default function ProjectList() {
                 </div>
                 <button
                   className="btn btn-ghost btn-sm"
-                  onClick={e => handleDelete(e, p.id, p.title)}
+                  onClick={e => requestDelete(e, p)}
                   style={{ opacity: 0.5 }}
                   onMouseEnter={e => e.currentTarget.style.opacity = '1'}
                   onMouseLeave={e => e.currentTarget.style.opacity = '0.5'}
@@ -128,6 +150,81 @@ export default function ProjectList() {
             ))}
           </div>
         )}
+      {deleteTarget && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-project-title"
+          onClick={cancelDelete}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 100,
+            background: 'rgba(0, 0, 0, 0.58)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 24
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              width: 'min(460px, 100%)',
+              background: 'var(--bg-panel)',
+              border: '1px solid var(--border)',
+              borderRadius: 14,
+              boxShadow: 'var(--shadow-lg)',
+              padding: 22
+            }}
+          >
+            <div
+              id="delete-project-title"
+              style={{
+                fontFamily: 'var(--font-display)',
+                fontSize: 20,
+                color: 'var(--red)',
+                marginBottom: 10
+              }}
+            >
+              Delete this project?
+            </div>
+
+            <div style={{ color: 'var(--text-primary)', fontSize: 14, lineHeight: 1.6, marginBottom: 8 }}>
+              You are about to permanently delete:
+            </div>
+
+            <div
+              style={{
+                background: 'var(--bg-surface)',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: 10,
+                padding: '10px 12px',
+                color: 'var(--text-primary)',
+                fontFamily: 'var(--font-display)',
+                fontSize: 16,
+                marginBottom: 12
+              }}
+            >
+              {deleteTarget.title}
+            </div>
+
+            <div style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.5, marginBottom: 20 }}>
+              This cannot be undone. All project documents, notes, brainstorm cards, chats, and related materials for this project will be removed.
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <button className="btn btn-ghost" type="button" onClick={cancelDelete} disabled={deleting}>
+                Cancel
+              </button>
+              <button className="btn btn-primary" type="button" onClick={confirmDelete} disabled={deleting}>
+                {deleting ? 'Deleting…' : 'Yes, delete project'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       </div>
     </div>
   )
