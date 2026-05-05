@@ -53,7 +53,8 @@ export default function DocumentsWorkspace({ onClose }) {
     setDocuments,
     setCurrentDocument,
     setActiveWorkspace,
-    addNotification
+    addNotification,
+    focusedScreenplayBlockIndex
   } = useStore()
 
   const [deletingId, setDeletingId] = useState(null)
@@ -86,6 +87,33 @@ export default function DocumentsWorkspace({ onClose }) {
 
     if (!existing) return appended
     return `${existing}\n\n${appended}`
+  }
+
+  function buildInsertedScreenplayContent(existingContent = '', insertedContent = '', insertAfterIndex = null) {
+    const existingLines = existingContent.split('\n')
+    const inserted = insertedContent.trim()
+    const index = Number(insertAfterIndex)
+
+    if (!Number.isInteger(index) || index < 0) {
+      return buildAppendedScreenplayContent(existingContent, inserted)
+    }
+
+    const nonEmptyLineIndexes = existingLines
+      .map((line, lineIndex) => line.trim() ? lineIndex : null)
+      .filter(lineIndex => lineIndex !== null)
+
+    const afterLineIndex = nonEmptyLineIndexes[index]
+
+    if (afterLineIndex === undefined) {
+      return buildAppendedScreenplayContent(existingContent, inserted)
+    }
+
+    const before = existingLines.slice(0, afterLineIndex + 1).join('\n').trimEnd()
+    const after = existingLines.slice(afterLineIndex + 1).join('\n').trimStart()
+
+    return after
+      ? `${before}\n\n${inserted}\n\n${after}`
+      : `${before}\n\n${inserted}`
   }
 
   async function refreshDocuments() {
@@ -300,16 +328,25 @@ export default function DocumentsWorkspace({ onClose }) {
 
     setSendingToScreenplay(true)
     try {
-      if (sendTarget.mode === 'append') {
+      if (sendTarget.mode === 'append' || sendTarget.mode === 'insert-after-focused') {
         const targetDoc = screenplayDocuments.find(doc => String(doc.id) === String(sendTarget.targetScreenplayId))
 
         if (!targetDoc) {
-          addNotification('Choose a screenplay document to append to first.', 'warning')
+          addNotification('Choose a screenplay document first.', 'warning')
           return
         }
 
+        if (sendTarget.mode === 'insert-after-focused' && !Number.isInteger(sendTarget.insertAfterIndex)) {
+          addNotification('Click a line in Screenplay first, then try inserting again.', 'warning')
+          return
+        }
+
+        const updatedContent = sendTarget.mode === 'insert-after-focused'
+          ? buildInsertedScreenplayContent(targetDoc.content || '', sendTarget.content, sendTarget.insertAfterIndex)
+          : buildAppendedScreenplayContent(targetDoc.content || '', sendTarget.content)
+
         const updated = await window.api.updateDocument(targetDoc.id, {
-          content: buildAppendedScreenplayContent(targetDoc.content || '', sendTarget.content)
+          content: updatedContent
         })
 
         const docs = await refreshDocuments()
@@ -318,7 +355,12 @@ export default function DocumentsWorkspace({ onClose }) {
         setSendTarget(null)
         setCurrentDocument(freshDoc)
         setActiveWorkspace('editor')
-        addNotification(`Appended to screenplay: ${freshDoc.title || targetDoc.title}.`, 'success')
+        addNotification(
+          sendTarget.mode === 'insert-after-focused'
+            ? `Inserted into screenplay: ${freshDoc.title || targetDoc.title}.`
+            : `Appended to screenplay: ${freshDoc.title || targetDoc.title}.`,
+          'success'
+        )
         return
       }
 
@@ -515,7 +557,7 @@ export default function DocumentsWorkspace({ onClose }) {
 
             <div style={{
               display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
               gap: 10,
               marginBottom: 14
             }}>
@@ -536,9 +578,30 @@ export default function DocumentsWorkspace({ onClose }) {
                 }))}
                 disabled={screenplayDocuments.length === 0}
                 style={{ opacity: screenplayDocuments.length ? 1 : 0.5 }}
-                title={screenplayDocuments.length ? 'Append this text to an existing screenplay document' : 'Create a screenplay document first'}
+                title={screenplayDocuments.length ? 'Append this text to the end of an existing screenplay document' : 'Create a screenplay document first'}
               >
-                Append to existing
+                Append to end
+              </button>
+              <button
+                type="button"
+                className={`btn ${sendTarget.mode === 'insert-after-focused' ? 'btn-primary' : 'btn-secondary'} no-drag`}
+                onClick={() => setSendTarget(target => ({
+                  ...target,
+                  mode: 'insert-after-focused',
+                  targetScreenplayId: target.targetScreenplayId || currentDocument?.id || screenplayDocuments[0]?.id || '',
+                  insertAfterIndex: focusedScreenplayBlockIndex
+                }))}
+                disabled={screenplayDocuments.length === 0 || !Number.isInteger(focusedScreenplayBlockIndex)}
+                style={{ opacity: screenplayDocuments.length && Number.isInteger(focusedScreenplayBlockIndex) ? 1 : 0.5 }}
+                title={
+                  screenplayDocuments.length === 0
+                    ? 'Create a screenplay document first'
+                    : Number.isInteger(focusedScreenplayBlockIndex)
+                      ? 'Insert this text after the last focused screenplay line'
+                      : 'Click a line in Screenplay first'
+                }
+              >
+                Insert after focused line
               </button>
             </div>
 
@@ -557,7 +620,7 @@ export default function DocumentsWorkspace({ onClose }) {
             ) : (
               <div style={{ marginBottom: 14 }}>
                 <label style={{ display: 'block', fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>
-                  Append to screenplay document
+                  {sendTarget.mode === 'insert-after-focused' ? 'Insert into screenplay document' : 'Append to screenplay document'}
                 </label>
                 <select
                   className="input selectable"
@@ -573,7 +636,9 @@ export default function DocumentsWorkspace({ onClose }) {
                   ))}
                 </select>
                 <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5, marginTop: 8 }}>
-                  This will add the preview text to the end of the selected screenplay. Existing screenplay text will be preserved.
+                  {sendTarget.mode === 'insert-after-focused'
+                    ? 'This will insert the preview text after the last focused screenplay line. Existing screenplay text will be preserved.'
+                    : 'This will add the preview text to the end of the selected screenplay. Existing screenplay text will be preserved.'}
                 </div>
               </div>
             )}
@@ -585,7 +650,11 @@ export default function DocumentsWorkspace({ onClose }) {
               marginBottom: 18
             }}>
               <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
-                {sendTarget.mode === 'append' ? 'Append Preview' : 'Preview'}
+                {sendTarget.mode === 'insert-after-focused'
+                  ? 'Insert Preview'
+                  : sendTarget.mode === 'append'
+                    ? 'Append Preview'
+                    : 'Preview'}
               </div>
               <pre className="selectable" style={{
                 margin: 0,
@@ -614,19 +683,29 @@ export default function DocumentsWorkspace({ onClose }) {
                 disabled={
                   sendingToScreenplay ||
                   (sendTarget.mode === 'create' && !sendTarget.title.trim()) ||
-                  (sendTarget.mode === 'append' && !sendTarget.targetScreenplayId)
+                  (sendTarget.mode === 'append' && !sendTarget.targetScreenplayId) ||
+                  (sendTarget.mode === 'insert-after-focused' && (!sendTarget.targetScreenplayId || !Number.isInteger(sendTarget.insertAfterIndex)))
                 }
                 style={{
                   opacity: !sendingToScreenplay &&
                     ((sendTarget.mode === 'create' && sendTarget.title.trim()) ||
-                    (sendTarget.mode === 'append' && sendTarget.targetScreenplayId))
+                    (sendTarget.mode === 'append' && sendTarget.targetScreenplayId) ||
+                    (sendTarget.mode === 'insert-after-focused' && sendTarget.targetScreenplayId && Number.isInteger(sendTarget.insertAfterIndex)))
                     ? 1
                     : 0.5
                 }}
               >
                 {sendingToScreenplay
-                  ? (sendTarget.mode === 'append' ? 'Appending…' : 'Creating…')
-                  : (sendTarget.mode === 'append' ? 'Append to Screenplay' : 'Create Screenplay Copy')}
+                  ? sendTarget.mode === 'insert-after-focused'
+                    ? 'Inserting…'
+                    : sendTarget.mode === 'append'
+                      ? 'Appending…'
+                      : 'Creating…'
+                  : sendTarget.mode === 'insert-after-focused'
+                    ? 'Insert into Screenplay'
+                    : sendTarget.mode === 'append'
+                      ? 'Append to Screenplay'
+                      : 'Create Screenplay Copy'}
               </button>
             </div>
           </div>
