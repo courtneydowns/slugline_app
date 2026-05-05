@@ -822,7 +822,7 @@ export default function DocumentsWorkspace({ onClose }) {
             const isChatExport = type === 'Chat Export'
             const isScreenplayDoc = type === 'Screenplay Document'
             const rowOpenLabel = isScreenplayDoc ? 'Open in Screenplay' : 'Open document'
-            const rowIcon = isScreenplayDoc ? '🎬' : (isChatExport ? '💬' : '✏')
+            const rowIcon = isScreenplayDoc ? '🎬' : (isChatExport ? '💬' : '🗒️')
             const rowMetaType = isScreenplayDoc ? 'Screenplay Document — opens in Screenplay' : type
             const words = doc.word_count || countWords(doc.content || '')
             const contentLength = doc.content?.length || 0
