@@ -78,6 +78,7 @@ export default function ScreenplayEditor() {
     setCurrentDocument,
     saveDocument,
     addNotification,
+    setFocusedScreenplayBlockId,
     layoutMode,
     suggestions,
     setSuggestions
@@ -85,6 +86,11 @@ export default function ScreenplayEditor() {
   const [blocks, setBlocks] = useState([{ id: Date.now(), type: 'action', text: '' }])
   const [focusedId, setFocusedId] = useState(null)
   const [selectedBlockIds, setSelectedBlockIds] = useState([])
+
+  function setFocusedBlock(blockId) {
+    setFocusedId(blockId)
+    setFocusedScreenplayBlockId?.(blockId)
+  }
   const [sceneNavigatorCollapsed, setSceneNavigatorCollapsed] = useState(false)
   const [savedAt, setSavedAt] = useState(null)
   const [writingPrompt, setWritingPrompt] = useState('')
@@ -200,7 +206,7 @@ export default function ScreenplayEditor() {
     undoStackRef.current = []
     redoStackRef.current = []
     setSelectedBlockIds([])
-    setFocusedId(null)
+    setFocusedBlock(null)
 
     if (currentDocument?.content) {
       setBlocks(fountainToBlocks(currentDocument.content))
@@ -301,7 +307,7 @@ export default function ScreenplayEditor() {
           el.focus()
           const pos = focusPosition === 'end' ? el.value.length : Number.isInteger(focusPosition) ? focusPosition : 0
           el.setSelectionRange(pos, pos)
-          setFocusedId(focusId)
+          setFocusedBlock(focusId)
         }
       }, 0)
     }
@@ -327,7 +333,7 @@ export default function ScreenplayEditor() {
         if (el) {
           el.focus()
           el.setSelectionRange(0, 0)
-          setFocusedId(nextFocus.id)
+          setFocusedBlock(nextFocus.id)
         }
       }, 0)
     }
@@ -353,7 +359,7 @@ export default function ScreenplayEditor() {
         if (el) {
           el.focus()
           el.setSelectionRange(0, 0)
-          setFocusedId(nextFocus.id)
+          setFocusedBlock(nextFocus.id)
         }
       }, 0)
     }
@@ -459,7 +465,7 @@ export default function ScreenplayEditor() {
     if (e.shiftKey && focusedId) {
       e.preventDefault()
       selectBlockRange(focusedId, block.id)
-      setFocusedId(block.id)
+      setFocusedBlock(block.id)
       refs.current[block.id]?.focus()
       return
     }
@@ -471,7 +477,7 @@ export default function ScreenplayEditor() {
           ? ids.filter(id => id !== block.id)
           : [...ids, block.id]
       ))
-      setFocusedId(block.id)
+      setFocusedBlock(block.id)
       refs.current[block.id]?.focus()
       return
     }
@@ -569,11 +575,11 @@ export default function ScreenplayEditor() {
     // Arrow up/down to navigate blocks
     if (e.key === 'ArrowUp' && index > 0) {
       const prev = blocks[index - 1]
-      setTimeout(() => { refs.current[prev.id]?.focus(); setFocusedId(prev.id) }, 0)
+      setTimeout(() => { refs.current[prev.id]?.focus(); setFocusedBlock(prev.id) }, 0)
     }
     if (e.key === 'ArrowDown' && index < blocks.length - 1) {
       const next = blocks[index + 1]
-      setTimeout(() => { refs.current[next.id]?.focus(); setFocusedId(next.id) }, 0)
+      setTimeout(() => { refs.current[next.id]?.focus(); setFocusedBlock(next.id) }, 0)
     }
   }
 
@@ -775,7 +781,7 @@ export default function ScreenplayEditor() {
               {blocks.filter(b => b.type === 'scene-heading' && b.text.trim()).map((b, i) => (
                 <div
                   key={b.id}
-                  onClick={() => { refs.current[b.id]?.focus(); refs.current[b.id]?.scrollIntoView({ behavior: 'smooth', block: 'center' }); setFocusedId(b.id) }}
+                  onClick={() => { refs.current[b.id]?.focus(); refs.current[b.id]?.scrollIntoView({ behavior: 'smooth', block: 'center' }); setFocusedBlock(b.id) }}
                   style={{ padding: '4px 8px', borderRadius: 4, cursor: 'pointer', fontSize: 11, color: focusedId === b.id ? 'var(--amber)' : 'var(--text-secondary)', marginBottom: 2, background: focusedId === b.id ? 'var(--amber-subtle)' : 'transparent' }}
                 >
                   {b.text.slice(0, 30)}{b.text.length > 30 ? '…' : ''}
@@ -854,7 +860,7 @@ export default function ScreenplayEditor() {
                 focused={focusedId === block.id}
                 selected={selectedBlockIds.includes(block.id)}
                 inputRef={el => refs.current[block.id] = el}
-                onFocus={() => setFocusedId(block.id)}
+                onFocus={() => setFocusedBlock(block.id)}
                 onMouseDown={e => handleBlockSelect(e, block)}
                 onChange={text => updateBlock(block.id, text)}
                 onKeyDown={e => handleKeyDown(e, block, index)}
