@@ -79,6 +79,7 @@ export default function ScreenplayEditor() {
     saveDocument,
     addNotification,
     setFocusedScreenplayBlockId,
+    setFocusedScreenplayBlockIndex,
     layoutMode,
     suggestions,
     setSuggestions
@@ -91,6 +92,16 @@ export default function ScreenplayEditor() {
     setFocusedId(blockId)
     setFocusedScreenplayBlockId?.(blockId)
   }
+
+  useEffect(() => {
+    if (!focusedId) {
+      setFocusedScreenplayBlockIndex?.(null)
+      return
+    }
+
+    const index = blocks.findIndex(block => block.id === focusedId)
+    setFocusedScreenplayBlockIndex?.(index >= 0 ? index : null)
+  }, [focusedId, blocks, setFocusedScreenplayBlockIndex])
   const [sceneNavigatorCollapsed, setSceneNavigatorCollapsed] = useState(false)
   const [savedAt, setSavedAt] = useState(null)
   const [writingPrompt, setWritingPrompt] = useState('')

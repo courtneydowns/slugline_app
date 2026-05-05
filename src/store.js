@@ -22,12 +22,14 @@ const useStore = create((set, get) => ({
   currentDocument: null,
   documents: [],
   focusedScreenplayBlockId: null,
+  focusedScreenplayBlockIndex: null,
 
   setProjects: (projects) => set({ projects }),
   setCurrentProject: (project) => set({ currentProject: project }),
   setCurrentDocument: (doc) => set({ currentDocument: doc }),
   setDocuments: (docs) => set({ documents: docs }),
   setFocusedScreenplayBlockId: (blockId) => set({ focusedScreenplayBlockId: blockId }),
+  setFocusedScreenplayBlockIndex: (blockIndex) => set({ focusedScreenplayBlockIndex: blockIndex }),
 
   loadProjects: async () => {
     const projects = await window.api.getAllProjects()
