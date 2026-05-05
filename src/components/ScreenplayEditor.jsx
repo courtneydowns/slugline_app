@@ -69,7 +69,7 @@ function fountainToBlocks(text) {
   return blocks.length > 0 ? blocks : [{ id: Date.now(), type: 'action', text: '' }]
 }
 
-export default function ScreenplayEditor() {
+export default function ScreenplayEditor({ onOpenDocuments }) {
   const {
     currentDocument,
     currentProject,
@@ -930,6 +930,21 @@ export default function ScreenplayEditor() {
           ))}
           <option value="__new__">+ New screenplay document</option>
         </select>
+        {onOpenDocuments && (
+          <button
+            className="btn btn-ghost btn-sm no-drag"
+            type="button"
+            onClick={onOpenDocuments}
+            title="Open project documents"
+            style={{
+              height: 30,
+              padding: '0 9px',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            ▤ Documents
+          </button>
+        )}
         {creatingScreenplay && (
           <>
             <input

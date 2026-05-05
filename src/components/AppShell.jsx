@@ -80,7 +80,7 @@ export default function AppShell() {
         return (
           <div className="workspace-editor-layout">
             <div className="workspace-editor-main">
-              <ScreenplayEditor />
+              <ScreenplayEditor onOpenDocuments={() => setActiveWorkspace('documents')} />
             </div>
             {showBible && layoutMode !== 'focus' && (
               <div className="workspace-side-panel">
