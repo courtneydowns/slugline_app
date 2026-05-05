@@ -557,17 +557,30 @@ export default function DocumentsWorkspace({ onClose }) {
 
             <div style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-              gap: 10,
+              gap: 8,
               marginBottom: 14
             }}>
               <button
                 type="button"
                 className={`btn ${sendTarget.mode === 'create' ? 'btn-primary' : 'btn-secondary'} no-drag`}
                 onClick={() => setSendTarget(target => ({ ...target, mode: 'create' }))}
+                style={{
+                  width: '100%',
+                  justifyContent: 'flex-start',
+                  textAlign: 'left',
+                  padding: '11px 12px',
+                  height: 'auto',
+                  lineHeight: 1.25
+                }}
               >
-                Create new copy
+                <span style={{ display: 'grid', gap: 3 }}>
+                  <strong>🎬 Create new script copy</strong>
+                  <span style={{ fontSize: 12, fontWeight: 400, opacity: 0.8 }}>
+                    Make a separate screenplay draft from this document.
+                  </span>
+                </span>
               </button>
+
               <button
                 type="button"
                 className={`btn ${sendTarget.mode === 'append' ? 'btn-primary' : 'btn-secondary'} no-drag`}
@@ -577,11 +590,25 @@ export default function DocumentsWorkspace({ onClose }) {
                   targetScreenplayId: target.targetScreenplayId || screenplayDocuments[0]?.id || ''
                 }))}
                 disabled={screenplayDocuments.length === 0}
-                style={{ opacity: screenplayDocuments.length ? 1 : 0.5 }}
+                style={{
+                  width: '100%',
+                  justifyContent: 'flex-start',
+                  textAlign: 'left',
+                  padding: '11px 12px',
+                  height: 'auto',
+                  lineHeight: 1.25,
+                  opacity: screenplayDocuments.length ? 1 : 0.5
+                }}
                 title={screenplayDocuments.length ? 'Append this text to the end of an existing screenplay document' : 'Create a screenplay document first'}
               >
-                Append to end
+                <span style={{ display: 'grid', gap: 3 }}>
+                  <strong>➕ Append to end</strong>
+                  <span style={{ fontSize: 12, fontWeight: 400, opacity: 0.8 }}>
+                    Add this text after the selected screenplay’s current content.
+                  </span>
+                </span>
               </button>
+
               <button
                 type="button"
                 className={`btn ${sendTarget.mode === 'insert-after-focused' ? 'btn-primary' : 'btn-secondary'} no-drag`}
@@ -592,7 +619,15 @@ export default function DocumentsWorkspace({ onClose }) {
                   insertAfterIndex: focusedScreenplayBlockIndex
                 }))}
                 disabled={screenplayDocuments.length === 0 || !Number.isInteger(focusedScreenplayBlockIndex)}
-                style={{ opacity: screenplayDocuments.length && Number.isInteger(focusedScreenplayBlockIndex) ? 1 : 0.5 }}
+                style={{
+                  width: '100%',
+                  justifyContent: 'flex-start',
+                  textAlign: 'left',
+                  padding: '11px 12px',
+                  height: 'auto',
+                  lineHeight: 1.25,
+                  opacity: screenplayDocuments.length && Number.isInteger(focusedScreenplayBlockIndex) ? 1 : 0.5
+                }}
                 title={
                   screenplayDocuments.length === 0
                     ? 'Create a screenplay document first'
@@ -601,7 +636,12 @@ export default function DocumentsWorkspace({ onClose }) {
                       : 'Click a line in Screenplay first'
                 }
               >
-                Insert after focused line
+                <span style={{ display: 'grid', gap: 3 }}>
+                  <strong>↳ Insert after focused line</strong>
+                  <span style={{ fontSize: 12, fontWeight: 400, opacity: 0.8 }}>
+                    Place this text after the last line you clicked in Screenplay.
+                  </span>
+                </span>
               </button>
             </div>
 
