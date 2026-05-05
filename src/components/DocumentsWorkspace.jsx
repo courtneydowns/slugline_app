@@ -60,6 +60,8 @@ export default function DocumentsWorkspace({ onClose }) {
   const [openedDocument, setOpenedDocument] = useState(null)
   const [editingContent, setEditingContent] = useState('')
   const [savingContent, setSavingContent] = useState(false)
+  const [sendTarget, setSendTarget] = useState(null)
+  const [sendingToScreenplay, setSendingToScreenplay] = useState(false)
 
   const sortedDocuments = useMemo(() => {
     return [...(documents || [])].sort((a, b) => {
@@ -256,6 +258,53 @@ export default function DocumentsWorkspace({ onClose }) {
     }
   }
 
+  function requestCreateScreenplayCopy() {
+    if (!openedDocument || isScreenplayDocument(openedDocument)) return
+
+    const content = editingContent.trim()
+    if (!content) {
+      addNotification('Add document text before sending it to screenplay.', 'warning')
+      return
+    }
+
+    setSendTarget({
+      source: openedDocument,
+      title: `${openedDocument.title || 'Untitled Document'} — Screenplay Copy`,
+      content
+    })
+  }
+
+  function cancelCreateScreenplayCopy() {
+    if (sendingToScreenplay) return
+    setSendTarget(null)
+  }
+
+  async function confirmCreateScreenplayCopy() {
+    if (!currentProject || !sendTarget || sendingToScreenplay) return
+
+    setSendingToScreenplay(true)
+    try {
+      const created = await window.api.createDocument({
+        project_id: currentProject.id,
+        title: sendTarget.title,
+        content: sendTarget.content,
+        document_type: 'screenplay'
+      })
+
+      const docs = await refreshDocuments()
+      const freshDoc = docs.find(doc => doc.id === created.id) || created
+
+      setSendTarget(null)
+      setCurrentDocument(freshDoc)
+      setActiveWorkspace('editor')
+      addNotification(`Created screenplay copy: ${freshDoc.title || sendTarget.title}.`, 'success')
+    } catch (err) {
+      addNotification('Could not create screenplay copy: ' + err.message, 'error')
+    } finally {
+      setSendingToScreenplay(false)
+    }
+  }
+
   return (
     <div className="documents-workspace">
       <div className="documents-workspace-header">
@@ -330,18 +379,19 @@ export default function DocumentsWorkspace({ onClose }) {
             background: 'var(--bg-panel)'
           }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', marginBottom: 12 }}>
-            <div>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
-                Open Document
-              </div>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, color: 'var(--text-primary)' }}>
-                {openedDocument.title || 'Untitled Document'}
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
-                {getDocumentType(openedDocument)}
-              </div>
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
+              Open Document
             </div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, color: 'var(--text-primary)' }}>
+              {openedDocument.title || 'Untitled Document'}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
+              {getDocumentType(openedDocument)}
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
             <button
               type="button"
               className="btn btn-primary no-drag"
@@ -349,6 +399,16 @@ export default function DocumentsWorkspace({ onClose }) {
               disabled={savingContent}
             >
               {savingContent ? 'Saving…' : 'Save Document'}
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary no-drag"
+              onClick={requestCreateScreenplayCopy}
+              disabled={!editingContent.trim()}
+              title="Create a new screenplay document from this document without changing the original"
+              style={{ opacity: editingContent.trim() ? 1 : 0.5 }}
+            >
+              Send to Screenplay
             </button>
           </div>
 
@@ -367,6 +427,94 @@ export default function DocumentsWorkspace({ onClose }) {
               padding: 14
             }}
           />
+        </div>
+      )}
+
+      {sendTarget && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 1000,
+            background: 'rgba(0, 0, 0, 0.55)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 24
+          }}
+          onMouseDown={cancelCreateScreenplayCopy}
+        >
+          <div
+            style={{
+              width: 'min(680px, 100%)',
+              maxHeight: '82vh',
+              overflow: 'auto',
+              background: 'var(--bg-panel)',
+              border: '1px solid var(--border)',
+              borderRadius: 16,
+              boxShadow: '0 24px 80px rgba(0, 0, 0, 0.45)',
+              padding: 22
+            }}
+            onMouseDown={e => e.stopPropagation()}
+          >
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, color: 'var(--text-primary)', marginBottom: 8 }}>
+              Create screenplay copy?
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: 14 }}>
+              This will create a new screenplay document from <strong style={{ color: 'var(--text-primary)' }}>{sendTarget.source?.title || 'Untitled Document'}</strong>. It will not change the original document or overwrite any existing screenplay.
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ display: 'block', fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>
+                New screenplay title
+              </label>
+              <input
+                className="input selectable"
+                value={sendTarget.title}
+                onChange={e => setSendTarget(target => ({ ...target, title: e.target.value }))}
+                style={{ width: '100%', fontSize: 13 }}
+              />
+            </div>
+            <div style={{
+              border: '1px solid var(--border-subtle)',
+              borderRadius: 12,
+              background: 'var(--bg-base)',
+              padding: 14,
+              marginBottom: 18
+            }}>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
+                Preview
+              </div>
+              <pre className="selectable" style={{
+                margin: 0,
+                maxHeight: 260,
+                overflow: 'auto',
+                whiteSpace: 'pre-wrap',
+                fontFamily: 'var(--font-screenplay)',
+                fontSize: 12,
+                lineHeight: 1.6,
+                color: 'var(--text-secondary)'
+              }}>{sendTarget.content}</pre>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <button
+                type="button"
+                className="btn btn-ghost no-drag"
+                onClick={cancelCreateScreenplayCopy}
+                disabled={sendingToScreenplay}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary no-drag"
+                onClick={confirmCreateScreenplayCopy}
+                disabled={sendingToScreenplay || !sendTarget.title.trim()}
+                style={{ opacity: !sendingToScreenplay && sendTarget.title.trim() ? 1 : 0.5 }}
+              >
+                {sendingToScreenplay ? 'Creating…' : 'Create Screenplay Copy'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
