@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, globalShortcut, Menu, dialog, shell } = require('electron')
+const { app, BrowserWindow, ipcMain, globalShortcut, Menu, dialog, shell, screen } = require('electron')
 const path = require('path')
 const { is } = require('@electron-toolkit/utils')
 const { registerChatSessionHandlers } = require('./ipc-chat-sessions')
@@ -7,11 +7,16 @@ let mainWindow = null
 let currentProjectId = null
 
 function createWindow() {
+  const { workArea } = screen.getPrimaryDisplay()
+
   mainWindow = new BrowserWindow({
-    width: 1400,
-    height: 900,
+    x: workArea.x,
+    y: workArea.y,
+    width: workArea.width,
+    height: workArea.height,
     minWidth: 900,
     minHeight: 600,
+    fullscreenable: false,
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 16, y: 16 },
     backgroundColor: '#f8f6f1',
@@ -25,7 +30,15 @@ function createWindow() {
     }
   })
 
-  mainWindow.once('ready-to-show', () => mainWindow.show())
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.setBounds({
+      x: workArea.x,
+      y: workArea.y,
+      width: workArea.width,
+      height: workArea.height
+    })
+    mainWindow.show()
+  })
 
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
