@@ -28,16 +28,21 @@ function countWords(text = '') {
 }
 
 function getDocumentType(doc) {
-  if (doc.document_type === 'chat-export') return 'Chat Export'
-  if (doc.document_type === 'screenplay') return 'Screenplay Document'
-  if (doc.document_type === 'project-document') return 'Project Document'
+  if (doc?.document_type === 'chat-export') return 'Chat Export'
+  if (doc?.document_type === 'screenplay') return 'Screenplay Document'
+  if (doc?.document_type === 'project-document') return 'Project Document'
 
-  const title = doc.title || ''
-  const content = doc.content || ''
+  const title = doc?.title || ''
+  const content = doc?.content || ''
+
   if (title.startsWith('Chat Export')) return 'Chat Export'
   if (/\nChat: .+\nExported: /m.test(content)) return 'Chat Export'
   if (content.includes('\n## User\n\n') || content.includes('\n## Assistant\n\n')) return 'Chat Export'
-  return 'Screenplay Document'
+
+  // Legacy/ambiguous rows should stay editable in Documents instead of being
+  // routed into Screenplay Editor. Only explicit document_type='screenplay'
+  // should behave as a screenplay document.
+  return 'Project Document'
 }
 
 export default function DocumentsWorkspace({ onClose }) {
@@ -71,6 +76,18 @@ export default function DocumentsWorkspace({ onClose }) {
     })
   }, [documents])
 
+  const screenplayDocuments = useMemo(() => {
+    return (documents || []).filter(doc => isScreenplayDocument(doc))
+  }, [documents])
+
+  function buildAppendedScreenplayContent(existingContent = '', appendedContent = '') {
+    const existing = existingContent.trimEnd()
+    const appended = appendedContent.trim()
+
+    if (!existing) return appended
+    return `${existing}\n\n${appended}`
+  }
+
   async function refreshDocuments() {
     if (!currentProject) return []
     const docs = await window.api.getAllDocuments(currentProject.id)
@@ -79,7 +96,7 @@ export default function DocumentsWorkspace({ onClose }) {
   }
 
   function isScreenplayDocument(doc) {
-    return (doc?.document_type || 'screenplay') === 'screenplay' && getDocumentType(doc) === 'Screenplay Document'
+    return doc?.document_type === 'screenplay' && getDocumentType(doc) === 'Screenplay Document'
   }
 
   useEffect(() => {
@@ -268,9 +285,11 @@ export default function DocumentsWorkspace({ onClose }) {
     }
 
     setSendTarget({
+      mode: 'create',
       source: openedDocument,
       title: `${openedDocument.title || 'Untitled Document'} — Screenplay Copy`,
-      content
+      content,
+      targetScreenplayId: screenplayDocuments[0]?.id || ''
     })
   }
 
@@ -284,6 +303,28 @@ export default function DocumentsWorkspace({ onClose }) {
 
     setSendingToScreenplay(true)
     try {
+      if (sendTarget.mode === 'append') {
+        const targetDoc = screenplayDocuments.find(doc => String(doc.id) === String(sendTarget.targetScreenplayId))
+
+        if (!targetDoc) {
+          addNotification('Choose a screenplay document to append to first.', 'warning')
+          return
+        }
+
+        const updated = await window.api.updateDocument(targetDoc.id, {
+          content: buildAppendedScreenplayContent(targetDoc.content || '', sendTarget.content)
+        })
+
+        const docs = await refreshDocuments()
+        const freshDoc = docs.find(doc => doc.id === updated.id) || updated
+
+        setSendTarget(null)
+        setCurrentDocument(freshDoc)
+        setActiveWorkspace('editor')
+        addNotification(`Appended to screenplay: ${freshDoc.title || targetDoc.title}.`, 'success')
+        return
+      }
+
       const created = await window.api.createDocument({
         project_id: currentProject.id,
         title: sendTarget.title,
@@ -299,7 +340,7 @@ export default function DocumentsWorkspace({ onClose }) {
       setActiveWorkspace('editor')
       addNotification(`Created screenplay copy: ${freshDoc.title || sendTarget.title}.`, 'success')
     } catch (err) {
-      addNotification('Could not create screenplay copy: ' + err.message, 'error')
+      addNotification('Could not send to screenplay: ' + err.message, 'error')
     } finally {
       setSendingToScreenplay(false)
     }
@@ -458,22 +499,76 @@ export default function DocumentsWorkspace({ onClose }) {
             onMouseDown={e => e.stopPropagation()}
           >
             <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, color: 'var(--text-primary)', marginBottom: 8 }}>
-              Create screenplay copy?
+              Send to screenplay?
             </div>
             <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: 14 }}>
-              This will create a new screenplay document from <strong style={{ color: 'var(--text-primary)' }}>{sendTarget.source?.title || 'Untitled Document'}</strong>. It will not change the original document or overwrite any existing screenplay.
+              Send text from <strong style={{ color: 'var(--text-primary)' }}>{sendTarget.source?.title || 'Untitled Document'}</strong> to a screenplay document. The source document will not be changed.
             </div>
-            <div style={{ marginBottom: 14 }}>
-              <label style={{ display: 'block', fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>
-                New screenplay title
-              </label>
-              <input
-                className="input selectable"
-                value={sendTarget.title}
-                onChange={e => setSendTarget(target => ({ ...target, title: e.target.value }))}
-                style={{ width: '100%', fontSize: 13 }}
-              />
+
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: 10,
+              marginBottom: 14
+            }}>
+              <button
+                type="button"
+                className={`btn ${sendTarget.mode === 'create' ? 'btn-primary' : 'btn-secondary'} no-drag`}
+                onClick={() => setSendTarget(target => ({ ...target, mode: 'create' }))}
+              >
+                Create new copy
+              </button>
+              <button
+                type="button"
+                className={`btn ${sendTarget.mode === 'append' ? 'btn-primary' : 'btn-secondary'} no-drag`}
+                onClick={() => setSendTarget(target => ({
+                  ...target,
+                  mode: 'append',
+                  targetScreenplayId: target.targetScreenplayId || screenplayDocuments[0]?.id || ''
+                }))}
+                disabled={screenplayDocuments.length === 0}
+                style={{ opacity: screenplayDocuments.length ? 1 : 0.5 }}
+                title={screenplayDocuments.length ? 'Append this text to an existing screenplay document' : 'Create a screenplay document first'}
+              >
+                Append to existing
+              </button>
             </div>
+
+            {sendTarget.mode === 'create' ? (
+              <div style={{ marginBottom: 14 }}>
+                <label style={{ display: 'block', fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>
+                  New screenplay title
+                </label>
+                <input
+                  className="input selectable"
+                  value={sendTarget.title}
+                  onChange={e => setSendTarget(target => ({ ...target, title: e.target.value }))}
+                  style={{ width: '100%', fontSize: 13 }}
+                />
+              </div>
+            ) : (
+              <div style={{ marginBottom: 14 }}>
+                <label style={{ display: 'block', fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>
+                  Append to screenplay document
+                </label>
+                <select
+                  className="input selectable"
+                  value={sendTarget.targetScreenplayId || ''}
+                  onChange={e => setSendTarget(target => ({ ...target, targetScreenplayId: e.target.value }))}
+                  style={{ width: '100%', fontSize: 13 }}
+                >
+                  <option value="">Choose a screenplay document…</option>
+                  {screenplayDocuments.map(doc => (
+                    <option key={doc.id} value={doc.id}>
+                      {doc.title || 'Untitled Screenplay'}
+                    </option>
+                  ))}
+                </select>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5, marginTop: 8 }}>
+                  This will add the preview text to the end of the selected screenplay. Existing screenplay text will be preserved.
+                </div>
+              </div>
+            )}
             <div style={{
               border: '1px solid var(--border-subtle)',
               borderRadius: 12,
@@ -482,7 +577,7 @@ export default function DocumentsWorkspace({ onClose }) {
               marginBottom: 18
             }}>
               <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
-                Preview
+                {sendTarget.mode === 'append' ? 'Append Preview' : 'Preview'}
               </div>
               <pre className="selectable" style={{
                 margin: 0,
@@ -508,10 +603,22 @@ export default function DocumentsWorkspace({ onClose }) {
                 type="button"
                 className="btn btn-primary no-drag"
                 onClick={confirmCreateScreenplayCopy}
-                disabled={sendingToScreenplay || !sendTarget.title.trim()}
-                style={{ opacity: !sendingToScreenplay && sendTarget.title.trim() ? 1 : 0.5 }}
+                disabled={
+                  sendingToScreenplay ||
+                  (sendTarget.mode === 'create' && !sendTarget.title.trim()) ||
+                  (sendTarget.mode === 'append' && !sendTarget.targetScreenplayId)
+                }
+                style={{
+                  opacity: !sendingToScreenplay &&
+                    ((sendTarget.mode === 'create' && sendTarget.title.trim()) ||
+                    (sendTarget.mode === 'append' && sendTarget.targetScreenplayId))
+                    ? 1
+                    : 0.5
+                }}
               >
-                {sendingToScreenplay ? 'Creating…' : 'Create Screenplay Copy'}
+                {sendingToScreenplay
+                  ? (sendTarget.mode === 'append' ? 'Appending…' : 'Creating…')
+                  : (sendTarget.mode === 'append' ? 'Append to Screenplay' : 'Create Screenplay Copy')}
               </button>
             </div>
           </div>
