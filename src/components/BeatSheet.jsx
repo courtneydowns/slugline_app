@@ -70,7 +70,7 @@ export default function BeatSheet({ onClose, embedded }) {
           <div>
             <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, color: 'var(--amber)' }}>Beat Sheet</div>
             <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-              {currentProject?.format === 'pilot' ? 'TV Pilot Structure' : 'Feature Film — Blake Snyder Beat Sheet'}
+              {currentProject?.format === 'pilot' ? 'TV Pilot Structure' : currentProject?.format === 'series' ? 'TV Series Structure' : currentProject?.format === 'episode' ? 'Episode Structure' : 'Feature Film — Blake Snyder Beat Sheet'}
             </div>
           </div>
           <div style={{ display: 'flex', gap: 10 }}>

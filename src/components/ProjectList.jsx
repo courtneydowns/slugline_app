@@ -199,7 +199,7 @@ export default function ProjectList() {
                     {p.title}
                   </div>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <span className="tag tag-muted">{p.format === 'pilot' ? 'TV Pilot' : p.format === 'episode' ? 'Episode' : 'Feature'}</span>
+                    <span className="tag tag-muted">{p.format === 'pilot' ? 'TV Pilot' : p.format === 'episode' ? 'Episode' : p.format === 'series' ? 'TV Series' : 'Feature'}</span>
                     {p.genre && <span className="tag tag-amber">{p.genre}</span>}
                     <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
                       {new Date(p.updated_at).toLocaleDateString()}
@@ -306,6 +306,7 @@ export default function ProjectList() {
                 >
                   <option value="feature">Feature Film</option>
                   <option value="pilot">TV Pilot</option>
+                  <option value="series">TV Series</option>
                   <option value="episode">Episode</option>
                 </select>
               </div>

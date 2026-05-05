@@ -7,7 +7,7 @@ PRAGMA foreign_keys=ON;
 CREATE TABLE IF NOT EXISTS projects (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   title TEXT NOT NULL DEFAULT 'Untitled Project',
-  format TEXT NOT NULL DEFAULT 'feature', -- 'feature' | 'pilot' | 'episode'
+  format TEXT NOT NULL DEFAULT 'feature', -- 'feature' | 'pilot' | 'series' | 'episode'
   genre TEXT,
   tone TEXT,
   logline TEXT,

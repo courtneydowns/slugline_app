@@ -82,7 +82,7 @@ export default function Dashboard() {
         <div className="dashboard-hero-inner">
           <div className="dashboard-project-meta">
             <span className="tag tag-amber" style={{ fontSize: 11 }}>
-              {currentProject?.format === 'pilot' ? 'TV Pilot' : 'Feature Film'}
+              {currentProject?.format === 'pilot' ? 'TV Pilot' : currentProject?.format === 'series' ? 'TV Series' : currentProject?.format === 'episode' ? 'Episode' : 'Feature Film'}
             </span>
             {currentProject?.genre && (
               <span className="tag tag-muted" style={{ fontSize: 11 }}>{currentProject.genre}</span>

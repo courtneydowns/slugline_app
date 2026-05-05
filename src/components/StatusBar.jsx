@@ -88,7 +88,7 @@ export default function StatusBar({ onPanic }) {
         <>
           <span style={{ color: 'var(--border)' }}>|</span>
           <span className="tag tag-muted" style={{ fontSize: 9, padding: '1px 6px' }}>
-            {currentProject.format === 'pilot' ? 'TV Pilot' : 'Feature'}
+            {currentProject.format === 'pilot' ? 'TV Pilot' : currentProject.format === 'series' ? 'TV Series' : currentProject.format === 'episode' ? 'Episode' : 'Feature'}
           </span>
         </>
       )}

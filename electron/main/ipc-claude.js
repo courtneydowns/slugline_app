@@ -138,7 +138,7 @@ async function handleChat(event, { projectId, message, chatHistory, documentCont
   const systemPrompt = [
     `You are a screenplay development collaborator working on "${project.title}".`,
     project.logline  ? `Logline: ${project.logline}` : '',
-    project.format   ? `Format: ${project.format === 'pilot' ? 'TV Pilot / Limited Series' : 'Feature Film'}` : '',
+    project.format   ? `Format: ${project.format === 'pilot' ? 'TV Pilot / Limited Series' : project.format === 'series' ? 'TV Series' : project.format === 'episode' ? 'Episode' : 'Feature Film'}` : '',
     project.tone     ? `Tone: ${project.tone}` : '',
     bibleContext     ? `\nSTORY BIBLE:\n${bibleContext}` : '',
     documentContext  ? `\nCURRENT SCENE CONTEXT:\n${documentContext.slice(0, 800)}` : '',
