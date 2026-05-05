@@ -112,6 +112,11 @@ export default function DocumentsWorkspace({ onClose }) {
     setEditingContent(doc.content || '')
   }
 
+  function closeOpenedDocument() {
+    setOpenedDocument(null)
+    setEditingContent('')
+  }
+
   async function saveDocumentContent() {
     if (!openedDocument?.id || isScreenplayDocument(openedDocument) || savingContent) return
 
@@ -412,16 +417,27 @@ export default function DocumentsWorkspace({ onClose }) {
             background: 'var(--bg-panel)'
           }}
         >
-          <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
-              Open Document
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', marginBottom: 12 }}>
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
+                Open Document
+              </div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, color: 'var(--text-primary)' }}>
+                {openedDocument.title || 'Untitled Document'}
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
+                {getDocumentType(openedDocument)}
+              </div>
             </div>
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, color: 'var(--text-primary)' }}>
-              {openedDocument.title || 'Untitled Document'}
-            </div>
-            <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
-              {getDocumentType(openedDocument)}
-            </div>
+
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm no-drag"
+              onClick={closeOpenedDocument}
+              title="Return to the Documents list"
+            >
+              Back to Documents
+            </button>
           </div>
 
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
