@@ -94,7 +94,8 @@ const useStore = create((set, get) => ({
     const { currentDocument } = get()
     if (!currentDocument) return
     const updated = await window.api.updateDocument(currentDocument.id, { content })
-    set({ currentDocument: updated })
+    const freshDocs = (get().documents || []).map(d => d.id === updated.id ? updated : d)
+    set({ currentDocument: updated, documents: freshDocs })
   },
 
   // ─── Story Bible ──────────────────────────────────────────────────────────
