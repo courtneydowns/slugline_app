@@ -165,7 +165,7 @@ export default function DocumentsWorkspace({ onClose }) {
 
   function startCreateDocument(kind) {
     setCreatingKind(kind)
-    setNewDocumentTitle(kind === 'screenplay' ? 'Pilot / Episode 1' : 'New Project Document')
+    setNewDocumentTitle(kind === 'screenplay' ? 'Untitled Script Draft' : 'New Project Notes')
   }
 
   function cancelCreateDocument() {
@@ -392,15 +392,15 @@ export default function DocumentsWorkspace({ onClose }) {
           <div className="documents-eyebrow">Project Documents</div>
           <h1 className="documents-title">Documents</h1>
           <p className="documents-subtitle">
-            Saved chat exports and project documents live here. Your screenplay stays in the Screenplay workspace.
+            Saved chat exports, notes, and reference docs live here. Script drafts open in the Screenplay workspace.
           </p>
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0 }}>
           <button className="btn btn-primary no-drag" onClick={() => startCreateDocument('screenplay')}>
-            + New Screenplay Document
+            🎬 New Script Draft
           </button>
           <button className="btn btn-secondary no-drag" onClick={() => startCreateDocument('project')}>
-            + New Project Document
+            🗒️ New Notes Document
           </button>
           {onClose && (
             <button className="btn btn-secondary no-drag" onClick={onClose}>
@@ -422,7 +422,7 @@ export default function DocumentsWorkspace({ onClose }) {
           background: 'var(--bg-panel)'
         }}>
           <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 650 }}>
-            {creatingKind === 'screenplay' ? 'New screenplay:' : 'New project document:'}
+            {creatingKind === 'screenplay' ? 'New script draft:' : 'New notes document:'}
           </div>
           <input
             className="input selectable"
@@ -812,7 +812,7 @@ export default function DocumentsWorkspace({ onClose }) {
         <div className="documents-empty">
           <div className="documents-empty-icon">▤</div>
           <h2>No saved documents yet</h2>
-          <p>Use Save Chat for transcripts, or create a named screenplay/project document yourself.</p>
+          <p>Use Save Chat for transcripts, create script drafts for screenplay work, or create notes docs for reference material.</p>
         </div>
       ) : (
         <div className="documents-list">

@@ -928,14 +928,14 @@ export default function ScreenplayEditor({ onOpenDocuments }) {
               {doc.title || (index === 0 ? 'Pilot / Episode 1' : `Episode ${index + 1}`)}
             </option>
           ))}
-          <option value="__new__">+ New screenplay document</option>
+          <option value="__new__">🎬 New Script Draft</option>
         </select>
         {onOpenDocuments && (
           <button
             className="btn btn-ghost btn-sm no-drag"
             type="button"
             onClick={onOpenDocuments}
-            title="Open project documents"
+            title="Open notes, chat exports, and project documents"
             style={{
               height: 30,
               padding: '0 9px',
