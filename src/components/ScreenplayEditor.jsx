@@ -127,6 +127,14 @@ export default function ScreenplayEditor({ onOpenDocuments }) {
   const [newScreenplayTitle, setNewScreenplayTitle] = useState('')
   const saveTimer = useRef(null)
   const promptTimer = useRef(null)
+  // Always-current refs used by the unmount-flush effect (cannot use state there)
+  const latestBlocksRef = useRef(blocks)
+  const latestDocIdRef = useRef(null)
+  // Keep refs current so the unmount-flush effect always has fresh values
+  latestBlocksRef.current = blocks
+  if (currentDocument && isScreenplayDocument(currentDocument)) {
+    latestDocIdRef.current = currentDocument.id
+  }
   const refs = useRef({})
   const containerRef = useRef()
   const undoStackRef = useRef([])
@@ -160,7 +168,8 @@ export default function ScreenplayEditor({ onOpenDocuments }) {
   }, [documents])
 
   async function saveCurrentScreenplayNow() {
-    if (!isScreenplayDocument(currentDocument)) return
+    const doc = currentDocument   // capture at call time
+    if (!isScreenplayDocument(doc)) return
 
     if (saveTimer.current) {
       clearTimeout(saveTimer.current)
@@ -168,9 +177,16 @@ export default function ScreenplayEditor({ onOpenDocuments }) {
     }
 
     const content = blocksToFountain(blocks)
-    const updated = await window.api.updateDocument(currentDocument.id, { content })
-    setCurrentDocument(updated)
-    setSavedAt(new Date())
+    const updated = await window.api.updateDocument(doc.id, { content })
+    // Sync documents list so DocumentsWorkspace never opens a stale version
+    const state = useStore.getState()
+    const freshDocs = (state.documents || []).map(d => d.id === updated.id ? updated : d)
+    setDocuments(freshDocs)
+    // Only push currentDocument back if this doc is still active
+    if (state.currentDocument?.id === doc.id) {
+      setCurrentDocument(updated)
+      setSavedAt(new Date())
+    }
     window.dispatchEvent(new CustomEvent('slugline:save', { detail: 'saved' }))
   }
 
@@ -247,15 +263,27 @@ export default function ScreenplayEditor({ onOpenDocuments }) {
   }, [currentDocument?.id])
 
   // Auto-save on change (debounced 1.5s)
+  // CRITICAL FIX: capture documentId at effect-run time so a navigation that
+  // happens inside the 1.5 s debounce window never writes this content to
+  // whichever document currentDocument happens to point to when the timer fires.
   useEffect(() => {
     if (!isScreenplayDocument(currentDocument)) return
+    const documentId = currentDocument.id   // lock target at effect time
     if (saveTimer.current) clearTimeout(saveTimer.current)
     window.dispatchEvent(new CustomEvent('slugline:save', { detail: 'saving' }))
     saveTimer.current = setTimeout(async () => {
       const content = blocksToFountain(blocks)
       try {
-        await saveDocument(content)
-        setSavedAt(new Date())
+        const updated = await window.api.updateDocument(documentId, { content })
+        // Sync documents list so DocumentsWorkspace never opens a stale version
+        const st = useStore.getState()
+        const freshDocs = (st.documents || []).map(d => d.id === updated.id ? updated : d)
+        setDocuments(freshDocs)
+        // Only update currentDocument / savedAt if this doc is still displayed
+        if (st.currentDocument?.id === documentId) {
+          setCurrentDocument(updated)
+          setSavedAt(new Date())
+        }
         window.dispatchEvent(new CustomEvent('slugline:save', { detail: 'saved' }))
         // Update page count estimate
         const lines = content.split('\n').filter(l => l.trim()).length
@@ -267,6 +295,34 @@ export default function ScreenplayEditor({ onOpenDocuments }) {
     }, 1500)
     return () => clearTimeout(saveTimer.current)
   }, [blocks])
+
+  // Flush any unsaved content to DB when the component unmounts (e.g. user
+  // navigates away before the 1.5s debounce fires). Uses refs so the closure
+  // always sees the latest blocks / docId regardless of when React runs the
+  // cleanup.  Fire-and-forget: also syncs the documents list so that
+  // DocumentsWorkspace.openDocument() never hands back a stale copy.
+  useEffect(() => {
+    return () => {
+      const docId = latestDocIdRef.current
+      const dirtyBlocks = latestBlocksRef.current
+      if (!docId || !dirtyBlocks) return
+      if (saveTimer.current) {
+        clearTimeout(saveTimer.current)
+        saveTimer.current = null
+      }
+      const flushContent = blocksToFountain(dirtyBlocks)
+      window.api.updateDocument(docId, { content: flushContent })
+        .then(updated => {
+          const st = useStore.getState()
+          const freshDocs = (st.documents || []).map(d => d.id === updated.id ? updated : d)
+          st.setDocuments(freshDocs)
+          if (st.currentDocument?.id === docId) {
+            st.setCurrentDocument(updated)
+          }
+        })
+        .catch(() => {})
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Listen for menu element type commands
   useEffect(() => {
@@ -420,9 +476,16 @@ export default function ScreenplayEditor({ onOpenDocuments }) {
       id: Date.now() + Math.random() + i
     }))
 
-    const insertIndex = targetIndex + 1
+    // FIX: if the target block is empty, replace it in-place rather than
+    // inserting after it. This prevents pasting into L1 (or any empty block)
+    // from placing content at L2 instead.
+    const targetIsEmpty = !targetBlock.text.trim()
     const nextBlocks = [...blocks]
-    nextBlocks.splice(insertIndex, 0, ...newBlocks)
+    if (targetIsEmpty) {
+      nextBlocks.splice(targetIndex, 1, ...newBlocks)   // replace the empty block
+    } else {
+      nextBlocks.splice(targetIndex + 1, 0, ...newBlocks) // insert after non-empty block
+    }
 
     commitBlocks(nextBlocks, {
       selectedIds: newBlocks.map(b => b.id),
@@ -632,6 +695,26 @@ export default function ScreenplayEditor({ onOpenDocuments }) {
         })
       }
       return
+    }
+
+    // FIX: Backspace at the start of a non-empty block — merge this block's
+    // text onto the end of the previous block and remove this block.
+    if (e.key === 'Backspace' && block.text && index > 0) {
+      const textarea = refs.current[block.id]
+      if (textarea && textarea.selectionStart === 0 && textarea.selectionEnd === 0) {
+        e.preventDefault()
+        const prevBlock = blocks[index - 1]
+        const joinPos = prevBlock.text.length
+        const mergedText = prevBlock.text + block.text
+        const nextBlocks = blocks
+          .map(b => b.id === prevBlock.id ? { ...b, text: mergedText } : b)
+          .filter(b => b.id !== block.id)
+        commitBlocks(nextBlocks, {
+          focusId: prevBlock.id,
+          focusPosition: joinPos
+        })
+        return
+      }
     }
 
     // Arrow up/down to navigate blocks
@@ -1262,6 +1345,15 @@ export default function ScreenplayEditor({ onOpenDocuments }) {
         >
           ↷
         </button>
+        <button
+          className="btn btn-ghost btn-sm"
+          type="button"
+          onClick={saveCurrentScreenplayNow}
+          title="Save screenplay now"
+          style={{ borderColor: 'var(--border-subtle)' }}
+        >
+          💾 Save
+        </button>
         {focusedBlock && (
           <>
             <button className="btn btn-ghost btn-sm" type="button" onClick={() => handleInlineSuggest('Improve this line')}>✨ Suggest</button>
@@ -1298,6 +1390,22 @@ function BlockLine({ block, lineNumber, focused, selected, inputRef, onFocus, on
     'parenthetical': { marginLeft: '1.9in', marginRight: '1.3in' },
     'transition': { textAlign: 'right', textTransform: 'uppercase', marginTop: '1em' },
     'shot': { textTransform: 'uppercase', marginTop: '1em', fontWeight: 600 },
+    'note': { color: 'var(--text-muted)', fontStyle: 'italic' }
+  }
+
+  // FIX: text-style-only map for the <textarea> — no margins or spacing.
+  // styleMap is spread on the outer div (layout/indentation).
+  // textStyleMap is spread on the textarea (typography only).
+  // Previously spreading styleMap on BOTH doubled all margins, pushing
+  // Character/Dialogue/Parenthetical far off-screen to the right.
+  const textStyleMap = {
+    'scene-heading': { textTransform: 'uppercase', fontWeight: 'bold', color: 'var(--text-primary)' },
+    'action': {},
+    'character': { textTransform: 'uppercase' },
+    'dialogue': {},
+    'parenthetical': {},
+    'transition': { textAlign: 'right', textTransform: 'uppercase' },
+    'shot': { textTransform: 'uppercase', fontWeight: 600 },
     'note': { color: 'var(--text-muted)', fontStyle: 'italic' }
   }
 
@@ -1439,7 +1547,7 @@ function BlockLine({ block, lineNumber, focused, selected, inputRef, onFocus, on
           margin: 0,
           overflow: 'hidden',
           caretColor: 'var(--amber)',
-          ...styleMap[block.type]
+          ...textStyleMap[block.type]
         }}
         onInput={e => {
           e.target.style.height = 'auto'
