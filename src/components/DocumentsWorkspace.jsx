@@ -99,13 +99,8 @@ export default function DocumentsWorkspace({ onClose }) {
     return doc?.document_type === 'screenplay' && getDocumentType(doc) === 'Screenplay Document'
   }
 
-  useEffect(() => {
-    if (currentDocument && !isScreenplayDocument(currentDocument)) {
-      setOpenedDocument(currentDocument)
-      setEditingContent(currentDocument.content || '')
-    }
-  }, [currentDocument?.id, currentDocument?.content, currentDocument?.document_type])
-
+  // Keep Documents editor state local. Do not auto-expand a document just because
+  // currentDocument changes elsewhere; screenplay state may redirect non-screenplay docs.
   function openDocument(doc) {
     if (isScreenplayDocument(doc)) {
       setCurrentDocument(doc)
@@ -115,7 +110,6 @@ export default function DocumentsWorkspace({ onClose }) {
 
     setOpenedDocument(doc)
     setEditingContent(doc.content || '')
-    setCurrentDocument(doc)
   }
 
   async function saveDocumentContent() {
@@ -127,7 +121,6 @@ export default function DocumentsWorkspace({ onClose }) {
       const docs = await refreshDocuments()
       const freshDoc = docs.find(doc => doc.id === updated.id) || updated
       setOpenedDocument(freshDoc)
-      setCurrentDocument(freshDoc)
       setEditingContent(freshDoc.content || '')
       addNotification(`Saved ${freshDoc.title || 'document'}.`, 'success')
     } catch (err) {
@@ -171,7 +164,6 @@ export default function DocumentsWorkspace({ onClose }) {
         setActiveWorkspace('editor')
       } else {
         setOpenedDocument(selected)
-        setCurrentDocument(selected)
         setEditingContent(selected.content || '')
       }
 
@@ -693,10 +685,16 @@ export default function DocumentsWorkspace({ onClose }) {
             const title = doc.title || 'Untitled Document'
             const type = getDocumentType(doc)
             const isChatExport = type === 'Chat Export'
+            const isScreenplayDoc = type === 'Screenplay Document'
+            const rowOpenLabel = isScreenplayDoc ? 'Open in Screenplay' : 'Open document'
+            const rowIcon = isScreenplayDoc ? '🎬' : (isChatExport ? '💬' : '✏')
+            const rowMetaType = isScreenplayDoc ? 'Screenplay Document — opens in Screenplay' : type
             const words = doc.word_count || countWords(doc.content || '')
             const contentLength = doc.content?.length || 0
             const updated = formatDateTime(doc.updated_at || doc.created_at)
-            const isCurrent = currentDocument?.id === doc.id
+            const isCurrent = isScreenplayDoc
+              ? currentDocument?.id === doc.id
+              : openedDocument?.id === doc.id
             const isDeleting = deletingId === doc.id
 
             return (
@@ -718,9 +716,10 @@ export default function DocumentsWorkspace({ onClose }) {
                       openDocument(doc)
                     }
                   }}
-                  title={renamingId === doc.id ? 'Renaming document' : 'Open document'}
+                  title={renamingId === doc.id ? 'Renaming document' : rowOpenLabel}
+                  aria-label={renamingId === doc.id ? 'Renaming document' : rowOpenLabel}
                 >
-                  <span className="documents-row-icon">{isChatExport ? '💬' : '✏'}</span>
+                  <span className="documents-row-icon">{rowIcon}</span>
                   <span className="documents-row-text">
                     {renamingId === doc.id ? (
                       <span
@@ -765,13 +764,27 @@ export default function DocumentsWorkspace({ onClose }) {
                       <span className="documents-row-title">{title}</span>
                     )}
                     <span className="documents-row-meta">
-                      {type} • Updated {updated} • {words.toLocaleString()} words • {contentLength.toLocaleString()} chars
+                      {rowMetaType} • Updated {updated} • {words.toLocaleString()} words • {contentLength.toLocaleString()} chars
                     </span>
                   </span>
                 </div>
 
                 <div className="documents-row-actions">
                   {isCurrent && <span className="documents-current-pill">Current</span>}
+                  {isScreenplayDoc && renamingId !== doc.id && (
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm no-drag"
+                      onClick={e => {
+                        e.stopPropagation()
+                        openDocument(doc)
+                      }}
+                      disabled={isDeleting}
+                      title="Open in Screenplay"
+                    >
+                      Open in Screenplay
+                    </button>
+                  )}
                   {renamingId !== doc.id && (
                     <button
                       className="btn btn-ghost btn-sm no-drag"
