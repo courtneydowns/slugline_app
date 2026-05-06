@@ -675,10 +675,15 @@ export default function ScreenplayEditor({ onOpenDocuments }) {
     const remaining = blocks.filter(b => !selectedSet.has(b.id))
     const nextBlocks = remaining.length > 0
       ? remaining
-      : [{ id: Date.now() + Math.random(), type: fallbackBlock?.type || 'action', text: '' }]
+      : [{ id: Date.now() + Math.random(), type: 'action', text: '' }]
 
-    const nextFocusIndex = Math.min(Math.max(firstSelectedIndex, 0), nextBlocks.length - 1)
-    const nextFocus = nextBlocks[nextFocusIndex]
+    // Focus the block immediately before the deleted range if it exists;
+    // otherwise focus the block now at the first deleted index (clamped).
+    const blockBeforeFirst = firstSelectedIndex > 0 ? blocks[firstSelectedIndex - 1] : null
+    const nextFocus =
+      (blockBeforeFirst && nextBlocks.find(b => b.id === blockBeforeFirst.id)) ||
+      nextBlocks[Math.min(firstSelectedIndex, nextBlocks.length - 1)] ||
+      nextBlocks[0]
 
     commitBlocks(nextBlocks, {
       selectedIds: [],
