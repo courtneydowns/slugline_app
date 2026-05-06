@@ -14,15 +14,26 @@ const ELEMENT_LABELS = {
 }
 
 // Smart next element type after pressing Enter
-function nextElementType(current, text) {
-  if (current === 'scene-heading') return 'action'
-  if (current === 'character') return 'dialogue'
-  if (current === 'dialogue') return 'action'
-  if (current === 'parenthetical') return 'dialogue'
-  if (current === 'action') return 'action'
-  if (current === 'transition') return 'scene-heading'
-  if (current === 'shot') return 'action'
-  return 'action'
+// scene-heading → action (start describing the scene)
+// action        → action (keep writing action)
+// character     → dialogue (character name followed by their line)
+// dialogue      → dialogue (continuing speech; user can Tab to change)
+// parenthetical → dialogue (wraps back into the speech)
+// transition    → scene-heading (transitions precede new scenes)
+// shot          → action (camera angle followed by what we see)
+// note          → note (keep writing notes together)
+function nextElementType(current) {
+  const map = {
+    'scene-heading': 'action',
+    'action':        'action',
+    'character':     'dialogue',
+    'dialogue':      'dialogue',
+    'parenthetical': 'dialogue',
+    'transition':    'scene-heading',
+    'shot':          'action',
+    'note':          'note',
+  }
+  return map[current] ?? 'action'
 }
 
 // Detect element type from text
@@ -612,6 +623,38 @@ export default function ScreenplayEditor({ onOpenDocuments }) {
     })
   }
 
+  function removeBlock(blockId) {
+    const target = blocks.find(b => b.id === blockId)
+    if (!target) return
+
+    // Non-empty: confirm before destroying content
+    if (target.text.trim().length > 0) {
+      const ok = window.confirm('Remove this block and its text?')
+      if (!ok) return
+    }
+
+    // Never leave zero blocks
+    if (blocks.length <= 1) {
+      const empty = { id: Date.now() + Math.random(), type: 'action', text: '' }
+      commitBlocks([empty], { focusId: empty.id, focusPosition: 0 })
+      return
+    }
+
+    const idx = blocks.findIndex(b => b.id === blockId)
+    const nextBlocks = blocks.filter(b => b.id !== blockId)
+    // Prefer next block; fall back to previous
+    const focusTarget = nextBlocks[idx] ?? nextBlocks[idx - 1]
+
+    setOpenTypeMenuId(null)
+    setOpenInsertMenuId(null)
+
+    commitBlocks(nextBlocks, {
+      focusId: focusTarget?.id,
+      focusPosition: 0
+    })
+  }
+
+
   function insertBlockNear(index, placement = 'below', type = 'action') {
     const safeType = ELEMENT_TYPES.includes(type) ? type : 'action'
     const newBlock = {
@@ -733,7 +776,7 @@ export default function ScreenplayEditor({ onOpenDocuments }) {
     // Enter — create new block
     if (e.key === 'Enter') {
       e.preventDefault()
-      const newType = nextElementType(block.type, block.text)
+      const newType = nextElementType(block.type)
       const newBlock = { id: Date.now() + Math.random(), type: newType, text: '' }
       const nextBlocks = [...blocks]
       nextBlocks.splice(index + 1, 0, newBlock)
@@ -1118,6 +1161,7 @@ export default function ScreenplayEditor({ onOpenDocuments }) {
                   setOpenInsertMenuId(current => current === block.id ? null : block.id)
                 }}
                 onInsertBlock={(placement, type) => insertBlockNear(index, placement, type)}
+                onRemoveBlock={() => removeBlock(block.id)}
                 insertPlacement={insertPlacement}
                 onSetInsertPlacement={setInsertPlacement}
                 onKeyDown={e => handleKeyDown(e, block, index)}
@@ -1287,7 +1331,7 @@ export default function ScreenplayEditor({ onOpenDocuments }) {
   )
 }
 
-function BlockLine({ block, blockIndex, lineNumber, focused, selected, inputRef, onFocus, onMouseDown, onChange, onTypeChange, onChangeBlockType, typeMenuOpen, insertMenuOpen, onToggleInsertMenu, onInsertBlock, insertPlacement, onSetInsertPlacement, onKeyDown, onCopy, onCut, onPaste }) {
+function BlockLine({ block, blockIndex, lineNumber, focused, selected, inputRef, onFocus, onMouseDown, onChange, onTypeChange, onChangeBlockType, typeMenuOpen, insertMenuOpen, onToggleInsertMenu, onInsertBlock, onRemoveBlock, insertPlacement, onSetInsertPlacement, onKeyDown, onCopy, onCut, onPaste }) {
   const controlsVisible = focused || selected || typeMenuOpen || insertMenuOpen
   const localRef = useRef(null)
   const lineRef = useRef(null)
@@ -1427,7 +1471,10 @@ function BlockLine({ block, blockIndex, lineNumber, focused, selected, inputRef,
           top: 22,
           opacity: controlsVisible ? 1 : 0,
           transition: 'opacity 0.15s',
-          zIndex: 2
+          zIndex: 2,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 4,
         }}
       >
         <button
@@ -1450,6 +1497,31 @@ function BlockLine({ block, blockIndex, lineNumber, focused, selected, inputRef,
           }}
         >
           +
+        </button>
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm selectable"
+          onMouseDown={e => e.stopPropagation()}
+          onClick={e => {
+            e.stopPropagation()
+            onRemoveBlock()
+          }}
+          title="Remove block"
+          aria-label="Remove block"
+          style={{
+            width: 22,
+            height: 22,
+            padding: 0,
+            borderRadius: 999,
+            justifyContent: 'center',
+            background: 'var(--bg-raised)',
+            borderColor: 'var(--border-subtle)',
+            color: 'var(--text-muted)',
+            fontSize: 13,
+            lineHeight: 1,
+          }}
+        >
+          ×
         </button>
       </div>
 
