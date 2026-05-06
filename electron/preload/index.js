@@ -67,6 +67,7 @@ contextBridge.exposeInMainWorld('api', {
   validateApiKey: (apiKey) => ipcRenderer.invoke('claude:validate-key', { apiKey }),
   claudeChat: (data) => ipcRenderer.invoke('claude:chat', data),
   claudeCancelChat: (data) => ipcRenderer.invoke('claude:cancel-chat', data),
+  summarizeChatSession: (data) => ipcRenderer.invoke('claude:summarize-session', data),
   claudeInlineSuggest: (data) => ipcRenderer.invoke('claude:inline-suggest', data),
   claudeFullRewrite: (data) => ipcRenderer.invoke('claude:full-rewrite', data),
   claudeToneAdjust: (data) => ipcRenderer.invoke('claude:tone-adjust', data),

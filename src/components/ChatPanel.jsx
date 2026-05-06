@@ -221,6 +221,15 @@ export default function ChatPanel() {
       setSaveChatTitle('')
 
       addNotification('Saved chat to Documents.', 'success')
+
+      // Fire-and-forget: generate/update session summary for cross-session memory.
+      // Failure is silent — summary is best-effort.
+      if (currentChatSessionId) {
+        window.api.summarizeChatSession({
+          projectId: currentProject.id,
+          chatSessionId: currentChatSessionId
+        }).catch(() => {})
+      }
     } catch (err) {
       addNotification('Could not save chat: ' + err.message, 'error')
     }

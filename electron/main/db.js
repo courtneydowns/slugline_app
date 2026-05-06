@@ -12,6 +12,7 @@ function getDb() {
   db.exec(SCHEMA)
   migrateChatSessions(db)
   migrateDocumentTypes(db)
+  migrateSessionSummaries(db)
   return db
 }
 
@@ -90,6 +91,22 @@ function migrateDocumentTypes(database) {
       updateType.run(inferredType, doc.id)
     }
   }
+}
+
+// ─── Migration: Session Summaries ────────────────────────────────────────────
+// Safe, idempotent. Creates session_summaries table for cross-session chat memory.
+
+function migrateSessionSummaries(database) {
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS session_summaries (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      project_id      INTEGER NOT NULL,
+      chat_session_id INTEGER NOT NULL UNIQUE,
+      summary         TEXT    NOT NULL,
+      created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `)
 }
 
 // ─── Projects ────────────────────────────────────────────────────────────────
@@ -312,6 +329,7 @@ function renameChatSession(id, name) {
 function deleteChatSession(id) {
   const db = getDb()
   db.prepare('DELETE FROM chat_history WHERE chat_session_id = ?').run(id)
+  db.prepare('DELETE FROM session_summaries WHERE chat_session_id = ?').run(id)
   return db.prepare('DELETE FROM chat_sessions WHERE id = ?').run(id)
 }
 
@@ -346,6 +364,7 @@ function addChatMessage(data) {
 
 function clearChatHistory(projectId, context = 'chat', sessionId = null) {
   if (sessionId) {
+    getDb().prepare('DELETE FROM session_summaries WHERE chat_session_id = ?').run(sessionId)
     return getDb().prepare(
       'DELETE FROM chat_history WHERE project_id = ? AND context = ? AND chat_session_id = ?'
     ).run(projectId, context, sessionId)
@@ -353,6 +372,26 @@ function clearChatHistory(projectId, context = 'chat', sessionId = null) {
   return getDb().prepare(
     'DELETE FROM chat_history WHERE project_id = ? AND context = ?'
   ).run(projectId, context)
+}
+
+// ─── Session Summaries ────────────────────────────────────────────────────────
+
+function addSessionSummary(data) {
+  const db = getDb()
+  // UNIQUE on chat_session_id — replace if session was already summarised
+  db.prepare(`
+    INSERT INTO session_summaries (project_id, chat_session_id, summary, updated_at)
+    VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+    ON CONFLICT(chat_session_id) DO UPDATE SET
+      summary    = excluded.summary,
+      updated_at = CURRENT_TIMESTAMP
+  `).run(data.project_id, data.chat_session_id, data.summary)
+}
+
+function getSessionSummaries(projectId, limit = 3) {
+  return getDb().prepare(
+    'SELECT * FROM session_summaries WHERE project_id = ? ORDER BY updated_at DESC LIMIT ?'
+  ).all(projectId, limit)
 }
 
 // ─── Brainstorm ───────────────────────────────────────────────────────────────
@@ -512,6 +551,7 @@ module.exports = {
   getBeatSheet, upsertBeat, initializeBeatSheet,
   getChatSessions, createChatSession, renameChatSession, deleteChatSession,
   getChatHistory, addChatMessage, clearChatHistory,
+  addSessionSummary, getSessionSummaries,
   getBrainstormEntries, addBrainstormEntry, updateBrainstormEntry, deleteBrainstormEntry,
   createSnapshot, getSnapshots, getSnapshot, restoreSnapshot,
   getResearch, addResearch, deleteResearch,

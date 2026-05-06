@@ -135,11 +135,18 @@ async function handleChat(event, { projectId, message, chatHistory, documentCont
     research.length    ? `RESEARCH:\n${research.slice(0, 4).map(r => `${r.title}: ${r.summary || ''}`).join('\n')}` : ''
   ].filter(Boolean).join('\n\n')
 
+  // ── Cross-session memory: inject summaries of recent saved sessions ─────
+  const recentSummaries = db.getSessionSummaries(projectId, 3)
+  const summaryContext = recentSummaries.length
+    ? `PRIOR SESSION CONTEXT (most recent first):\n${recentSummaries.map((s, i) => `[Session ${i + 1}]\n${s.summary}`).join('\n\n')}`
+    : ''
+
   const systemPrompt = [
     `You are a screenplay development collaborator working on "${project.title}".`,
     project.logline  ? `Logline: ${project.logline}` : '',
     project.format   ? `Format: ${project.format === 'pilot' ? 'TV Pilot / Limited Series' : project.format === 'series' ? 'TV Series' : project.format === 'episode' ? 'Episode' : 'Feature Film'}` : '',
     project.tone     ? `Tone: ${project.tone}` : '',
+    summaryContext   ? `\n${summaryContext}` : '',
     bibleContext     ? `\nSTORY BIBLE:\n${bibleContext}` : '',
     documentContext  ? `\nCURRENT SCENE CONTEXT:\n${documentContext.slice(0, 800)}` : '',
     '\nWhen writing screenplay content, use proper screenplay format. Be a creative collaborator, not just an assistant.'
@@ -405,8 +412,43 @@ async function handleEstimateTokens(event, { text }) {
   return { estimate: estimateTokens(text) }
 }
 
+async function handleSummarizeSession(event, { projectId, chatSessionId }) {
+  // Best-effort: called fire-and-forget from renderer. All failures are silent.
+  try {
+    const messages = db.getChatHistory(projectId, 'chat', chatSessionId)
+    if (!messages || messages.length < 2) return { ok: true }
+
+    const transcript = messages
+      .map(m => `${m.role === 'user' ? 'Writer' : 'Claude'}: ${(m.content || '').slice(0, 600)}`)
+      .join('\n\n')
+
+    const client = getClient()
+    const response = await client.messages.create({
+      model: CLAUDE_MODELS.haiku,
+      max_tokens: 600,
+      system: 'Summarize this screenplay development chat session in 150-350 words. Cover: key creative decisions made, characters discussed, plot points raised, and any open questions left unresolved. Write in past tense, third person. Return only the summary text — no headers, no preamble.',
+      messages: [{ role: 'user', content: transcript.slice(0, 8000) }]
+    })
+
+    const summary = response.content[0]?.text || ''
+    if (summary) {
+      db.addSessionSummary({ project_id: projectId, chat_session_id: chatSessionId, summary })
+      db.logTokenUsage({
+        project_id: projectId,
+        model: CLAUDE_MODELS.haiku,
+        feature: 'chat-summarize',
+        input_tokens:  response.usage?.input_tokens  || 0,
+        output_tokens: response.usage?.output_tokens || 0
+      })
+    }
+    return { ok: true }
+  } catch {
+    return { ok: false }
+  }
+}
+
 module.exports = {
-  handleValidateApiKey, handleChat, handleCancelChat, handleInlineSuggestion, handleFullRewrite,
+  handleValidateApiKey, handleChat, handleCancelChat, handleSummarizeSession, handleInlineSuggestion, handleFullRewrite,
   handleToneAdjust, handleSceneAnalysis, handleDialogueCoach, handleDevelopmentQuestion,
   handleGenerateStoryBible, handleLoglineAssist, handleResearchIngest, handleAutoTag,
   handleWritingPrompt, handleTvVsFeature, handleBeatSheetAnalysis, handleEstimateTokens
