@@ -24,15 +24,32 @@ function toFdx(project, document) {
   const lines = content.split('\n')
 
   let paragraphs = ''
+  let inSpeech = false   // true after a Character cue; cleared by blank lines or structural elements
   lines.forEach(line => {
     const trimmed = line.trim()
-    if (!trimmed) return
+    if (!trimmed) {
+      inSpeech = false   // blank line ends the speech block
+      return
+    }
 
     let type = 'Action'
-    if (/^(INT\.|EXT\.|INT\/EXT\.)/.test(trimmed)) type = 'Scene Heading'
-    else if (/^[A-Z][A-Z\s\(\)\.]+$/.test(trimmed) && trimmed.length < 40) type = 'Character'
-    else if (/^\(/.test(trimmed)) type = 'Parenthetical'
-    else if (/^(FADE IN:|FADE OUT\.|CUT TO:)/.test(trimmed)) type = 'Transition'
+    if (/^(INT\.|EXT\.|INT\/EXT\.)/.test(trimmed)) {
+      type = 'Scene Heading'
+      inSpeech = false
+    } else if (/^(FADE IN:|FADE OUT\.|CUT TO:|SMASH CUT TO:|DISSOLVE TO:)/.test(trimmed)) {
+      type = 'Transition'
+      inSpeech = false
+    } else if (/^[A-Z][A-Z\s\(\)\.0-9\-]+$/.test(trimmed) && trimmed.length < 40 && !inSpeech) {
+      // All-caps line that isn't inside a speech block = character cue
+      type = 'Character'
+      inSpeech = true
+    } else if (/^\(/.test(trimmed) && inSpeech) {
+      type = 'Parenthetical'
+      // inSpeech stays true — parenthetical doesn't end the speech block
+    } else if (inSpeech) {
+      type = 'Dialogue'
+      // inSpeech stays true — multi-line dialogue is valid
+    }
 
     paragraphs += `  <Paragraph Type="${type}"><Text>${trimmed.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</Text></Paragraph>\n`
   })
@@ -94,6 +111,8 @@ async function toPdf(project, document) {
   page = pdfDoc.addPage([pageWidth, pageHeight])
   y = pageHeight - marginTop
 
+  let inSpeech = false   // true after a Character cue; cleared by blank line or structural element
+
   for (const line of lines) {
     if (y < marginBottom) {
       page = pdfDoc.addPage([pageWidth, pageHeight])
@@ -101,6 +120,7 @@ async function toPdf(project, document) {
     }
 
     if (!line.trim()) {
+      inSpeech = false   // blank line ends the speech block
       y -= lineHeight * 0.5
       continue
     }
@@ -112,13 +132,21 @@ async function toPdf(project, document) {
 
     if (/^(INT\.|EXT\.|INT\/EXT\.)/.test(trimmed)) {
       usedFont = boldFont
-    } else if (/^[A-Z][A-Z\s\(\)\.]+$/.test(trimmed) && trimmed.length < 40) {
+      inSpeech = false
+    } else if (/^(FADE|CUT|SMASH|DISSOLVE)/.test(trimmed)) {
+      // Transitions: left margin (right-aligning precisely requires measuring full line width)
+      inSpeech = false
+    } else if (/^[A-Z][A-Z\s\(\)\.0-9\-]+$/.test(trimmed) && trimmed.length < 40 && !inSpeech) {
+      // All-caps line not inside a speech block = character cue; roughly centered
       x = pageWidth / 2 - (trimmed.length * fontSize * 0.3)
-    } else if (/^\(/.test(trimmed)) {
-      x = marginLeft + 72
-    } else if (!/^(FADE|CUT|SMASH|DISSOLVE)/.test(trimmed)) {
-      x = marginLeft + 72  // indent for dialogue (simple heuristic)
+      inSpeech = true
+    } else if (/^\(/.test(trimmed) && inSpeech) {
+      x = marginLeft + 72   // parenthetical indent (inSpeech stays true)
+    } else if (inSpeech) {
+      x = marginLeft + 72   // dialogue indent
+      // inSpeech stays true — multi-line dialogue is valid
     }
+    // else: action — x stays at marginLeft
 
     const wrapped = wrapText(trimmed, usedFont, usedSize, maxWidth - (x - marginLeft))
     wrapped.forEach(wline => {
@@ -170,17 +198,37 @@ async function toDocx(project, document) {
     spacing: { after: 400 }
   }))
 
+  let inSpeech = false   // true after a Character cue; cleared by blank line or structural element
+
   for (const line of lines) {
     const trimmed = line.trim()
     if (!trimmed) {
+      inSpeech = false   // blank line ends the speech block
       paragraphs.push(new Paragraph({ spacing: { after: 100 } }))
       continue
     }
 
     const isSceneHeading = /^(INT\.|EXT\.|INT\/EXT\.)/.test(trimmed)
-    const isCharacter = /^[A-Z][A-Z\s\(\)\.]+$/.test(trimmed) && trimmed.length < 40
-    const isParenthetical = /^\(/.test(trimmed)
     const isTransition = /^(FADE|CUT|SMASH|DISSOLVE)/.test(trimmed)
+    // Character: all-caps line not currently inside a speech block
+    const isCharacter = !inSpeech && /^[A-Z][A-Z\s\(\)\.0-9\-]+$/.test(trimmed) && trimmed.length < 40
+    const isParenthetical = inSpeech && /^\(/.test(trimmed)
+    const isDialogue = inSpeech && !isParenthetical
+
+    // Update speech state
+    if (isSceneHeading || isTransition) inSpeech = false
+    else if (isCharacter) inSpeech = true
+    // parenthetical and dialogue lines leave inSpeech true
+
+    // Alignment
+    let alignment = AlignmentType.LEFT
+    if (isCharacter) alignment = AlignmentType.CENTER
+    if (isTransition) alignment = AlignmentType.RIGHT
+
+    // Indentation (in twentieths of a point; 1440 = 1 inch)
+    let indent = {}
+    if (isParenthetical) indent = { left: 1440, right: 2160 }
+    else if (isDialogue) indent = { left: 1440, right: 1440 }
 
     paragraphs.push(new Paragraph({
       children: [new TextRun({
@@ -189,8 +237,8 @@ async function toDocx(project, document) {
         size: 24,
         font: 'Courier New'
       })],
-      alignment: isCharacter || isTransition ? AlignmentType.CENTER : AlignmentType.LEFT,
-      indent: isParenthetical ? { left: 1440 } : isCharacter ? {} : { left: isCharacter ? 0 : 0 }
+      alignment,
+      indent
     }))
   }
 
@@ -266,9 +314,16 @@ async function handleImport(event, { filePath }) {
       content = fs.readFileSync(filePath, 'utf8')
     } else if (ext === '.fdx') {
       const raw = fs.readFileSync(filePath, 'utf8')
-      // Extract text from FDX XML
+      // Extract text from FDX XML and decode entities encoded by the exporter
       const textMatches = raw.match(/<Text>(.*?)<\/Text>/g) || []
-      content = textMatches.map(m => m.replace(/<\/?Text>/g, '')).join('\n')
+      content = textMatches.map(m => m
+        .replace(/<\/?Text>/g, '')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&apos;/g, "'")
+      ).join('\n')
     } else {
       throw new Error(`Unsupported import format: ${ext}`)
     }

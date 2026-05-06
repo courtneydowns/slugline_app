@@ -45,6 +45,7 @@ export default function ExportModal({ onClose }) {
       filters: [{ name: 'Screenplay Files', extensions: ['fountain', 'txt', 'md', 'fdx'] }]
     })
     if (result.canceled || !result.filePaths[0]) return
+    if (!window.confirm('Import will replace the current document content. This cannot be undone. Continue?')) return
     const imported = await window.api.importFile(result.filePaths[0])
     if (imported.success && currentDocument) {
       await window.api.updateDocument(currentDocument.id, { content: imported.content, title: imported.title })
