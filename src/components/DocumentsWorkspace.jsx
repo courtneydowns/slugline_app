@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import useStore from '../store'
 
 function formatDateTime(value) {
@@ -69,6 +69,57 @@ export default function DocumentsWorkspace({ onClose }) {
   const [sendTarget, setSendTarget] = useState(null)
   const [sendingToScreenplay, setSendingToScreenplay] = useState(false)
 
+  // ── Autosave refs (notes/project documents only) ───────────────────────────
+  const autosaveTimerRef = useRef(null)
+  const pendingSaveRef = useRef(null)
+  const latestEditingContentRef = useRef('')
+
+  useEffect(() => {
+    if (currentProject?.id) refreshDocuments()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!openedDocument?.id || openedDocument.document_type === 'screenplay') {
+      pendingSaveRef.current = null
+      return
+    }
+
+    pendingSaveRef.current = { docId: openedDocument.id, content: editingContent }
+
+    const docId = openedDocument.id
+    const content = editingContent
+    const timerId = setTimeout(async () => {
+      autosaveTimerRef.current = null
+      const pending = pendingSaveRef.current
+      if (!pending || pending.docId !== docId) return
+      pendingSaveRef.current = null
+      try {
+        await window.api.updateDocument(docId, { content })
+        if (currentProject?.id) {
+          const docs = await window.api.getAllDocuments(currentProject.id)
+          setDocuments(docs)
+        }
+      } catch (err) {
+        console.error('[DocumentsWorkspace] autosave error:', err)
+      }
+    }, 1500)
+    autosaveTimerRef.current = timerId
+
+    return () => clearTimeout(timerId)
+  }, [editingContent, openedDocument?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Unmount flush — last-resort for genuine unmounts (Dashboard/Screenplay nav).
+  // Back to Documents does NOT unmount, so closeOpenedDocument handles that path.
+  useEffect(() => {
+    return () => {
+      const pending = pendingSaveRef.current
+      if (!pending) return
+      pendingSaveRef.current = null
+      window.api.updateDocument(pending.docId, { content: pending.content })
+        .catch(err => console.error('[DocumentsWorkspace] unmount flush error:', err))
+    }
+  }, [])
+
   const sortedDocuments = useMemo(() => {
     return [...(documents || [])].sort((a, b) => {
       const aTime = new Date(a.updated_at || a.created_at || 0).getTime()
@@ -127,9 +178,28 @@ export default function DocumentsWorkspace({ onClose }) {
     return doc?.document_type === 'screenplay' && getDocumentType(doc) === 'Screenplay Document'
   }
 
+  async function flushOpenedDocumentNow(reason) {
+    if (!openedDocument?.id || openedDocument.document_type === 'screenplay') return
+    if (autosaveTimerRef.current) {
+      clearTimeout(autosaveTimerRef.current)
+      autosaveTimerRef.current = null
+    }
+    pendingSaveRef.current = null
+    const content = latestEditingContentRef.current
+    try {
+      const updated = await window.api.updateDocument(openedDocument.id, { content })
+      await refreshDocuments()
+      return updated || null
+    } catch (err) {
+      console.error(`[DocumentsWorkspace] ${reason} flush error:`, err)
+    }
+  }
+
   // Keep Documents editor state local. Do not auto-expand a document just because
   // currentDocument changes elsewhere; screenplay state may redirect non-screenplay docs.
-  function openDocument(doc) {
+  async function openDocument(doc) {
+    await flushOpenedDocumentNow('switch')
+
     if (isScreenplayDocument(doc)) {
       setCurrentDocument(doc)
       setActiveWorkspace('editor')
@@ -138,19 +208,26 @@ export default function DocumentsWorkspace({ onClose }) {
 
     setOpenedDocument(doc)
     setEditingContent(doc.content || '')
+    latestEditingContentRef.current = doc.content || ''
   }
 
-  function closeOpenedDocument() {
+  async function closeOpenedDocument() {
+    await flushOpenedDocumentNow('close')
     setOpenedDocument(null)
     setEditingContent('')
+    latestEditingContentRef.current = ''
   }
 
   async function saveDocumentContent() {
     if (!openedDocument?.id || isScreenplayDocument(openedDocument) || savingContent) return
 
+    clearTimeout(autosaveTimerRef.current)
+    autosaveTimerRef.current = null
+    pendingSaveRef.current = null
+
     setSavingContent(true)
     try {
-      const updated = await window.api.updateDocument(openedDocument.id, { content: editingContent })
+      const updated = await window.api.updateDocument(openedDocument.id, { content: latestEditingContentRef.current })
       const docs = await refreshDocuments()
       const freshDoc = docs.find(doc => doc.id === updated.id) || updated
       setOpenedDocument(freshDoc)
@@ -506,7 +583,7 @@ export default function DocumentsWorkspace({ onClose }) {
           <textarea
             className="input selectable"
             value={editingContent}
-            onChange={e => setEditingContent(e.target.value)}
+            onChange={e => { setEditingContent(e.target.value); latestEditingContentRef.current = e.target.value }}
             placeholder={openedDocument.document_type === 'chat-export' ? 'Saved chat transcript' : 'Write project notes here...'}
             style={{
               width: '100%',
