@@ -1443,12 +1443,21 @@ export default function ScreenplayEditor({ onOpenDocuments }) {
 
 function BlockLine({ block, lineNumber, focused, selected, inputRef, onFocus, onMouseDown, onChange, onTypeChange, typeMenuOpen, insertMenuOpen, onToggleInsertMenu, onKeyDown, onCopy, onCut, onPaste }) {
   const controlsVisible = focused || selected || typeMenuOpen || insertMenuOpen
+  const localRef = useRef(null)
+
+  useEffect(() => {
+    const ta = localRef.current
+    if (!ta) return
+    ta.style.height = 'auto'
+    ta.style.height = `${ta.scrollHeight}px`
+  }, [block.text, block.type])
+
   const styleMap = {
     'scene-heading': { textTransform: 'uppercase', fontWeight: 'bold', marginTop: '2em', color: 'var(--text-primary)' },
     'action': { marginBottom: '0.5em' },
-    'character': { marginLeft: '2.2in', marginTop: '1em', textTransform: 'uppercase' },
-    'dialogue': { marginLeft: '1.5in', marginRight: '1in' },
-    'parenthetical': { marginLeft: '1.9in', marginRight: '1.3in' },
+    'character': { marginLeft: '2.0in', marginTop: '1em', textTransform: 'uppercase' },
+    'dialogue': { marginLeft: '1.0in', marginRight: '0.5in' },
+    'parenthetical': { marginLeft: '1.5in', marginRight: '0.5in' },
     'transition': { textAlign: 'right', textTransform: 'uppercase', marginTop: '1em' },
     'shot': { textTransform: 'uppercase', marginTop: '1em', fontWeight: 600 },
     'note': { color: 'var(--text-muted)', fontStyle: 'italic' }
@@ -1584,7 +1593,10 @@ function BlockLine({ block, lineNumber, focused, selected, inputRef, onFocus, on
       </div>
 
       <textarea
-        ref={inputRef}
+        ref={el => {
+          localRef.current = el
+          if (typeof inputRef === 'function') inputRef(el)
+        }}
         className="selectable"
         value={block.text}
         onChange={e => onChange(e.target.value)}

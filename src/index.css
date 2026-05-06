@@ -193,20 +193,20 @@ button,
 
 .element-character {
   text-transform: uppercase;
-  margin-left: 2.2in;
+  margin-left: 2.0in;
   margin-top: 1em;
   margin-bottom: 0;
 }
 
 .element-dialogue {
-  margin-left: 1.5in;
-  margin-right: 1in;
+  margin-left: 1.0in;
+  margin-right: 0.5in;
   margin-bottom: 0.5em;
 }
 
 .element-parenthetical {
-  margin-left: 1.9in;
-  margin-right: 1.3in;
+  margin-left: 1.5in;
+  margin-right: 0.5in;
   margin-bottom: 0;
 }
 
