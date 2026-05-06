@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import useStore from '../store'
 import TopBar from './TopBar'
 import NavRail from './NavRail'
@@ -32,6 +32,8 @@ export default function AppShell() {
     currentProject, addNotification,
   } = useStore()
 
+  const [chatExpanded, setChatExpanded] = useState(false)
+
   useEffect(() => {
     const cleanups = [
       window.api.onMenu('menu:settings', () => setShowSettings(true)),
@@ -52,10 +54,10 @@ export default function AppShell() {
 
   async function handlePanicExport() {
     if (!currentProject) return
-    addNotification('⚡ Panic export started…', 'warning')
+    addNotification('\u26a1 Panic export started\u2026', 'warning')
     const result = await window.api.panicExport(currentProject.id)
     if (result.success) {
-      addNotification(`✓ Panic export saved to ${result.exports[0]?.path || 'backup folder'}`, 'success')
+      addNotification(`\u2713 Panic export saved to ${result.exports[0]?.path || 'backup folder'}`, 'success')
     } else {
       addNotification(`Panic export failed: ${result.error}`, 'error')
     }
@@ -65,9 +67,23 @@ export default function AppShell() {
     if (!currentProject) return
     const result = await window.api.manualBackup(currentProject.id)
     if (result.success) {
-      addNotification('✓ Backup saved', 'success')
+      addNotification('\u2713 Backup saved', 'success')
     } else {
       addNotification(`Backup failed: ${result.error}`, 'error')
+    }
+  }
+
+  async function handleChatPopOut() {
+    if (!currentProject) return
+    const sessionId = useStore.getState().currentChatSessionId
+    if (!sessionId) {
+      addNotification('No active chat session to pop out.', 'warning')
+      return
+    }
+    try {
+      await window.api.openChatPopout({ projectId: currentProject.id, sessionId })
+    } catch (err) {
+      addNotification('Could not open pop-out: ' + err.message, 'error')
     }
   }
 
@@ -75,7 +91,6 @@ export default function AppShell() {
     switch (activeWorkspace) {
       case 'dashboard':
         return <Dashboard />
-
       case 'editor':
         return (
           <div className="workspace-editor-layout">
@@ -89,62 +104,57 @@ export default function AppShell() {
             )}
           </div>
         )
-
       case 'documents':
         return (
           <div className="workspace-fullpage">
             <DocumentsWorkspace onClose={() => setActiveWorkspace('dashboard')} />
           </div>
         )
-
       case 'beatsheet':
         return (
           <div className="workspace-fullpage">
             <BeatSheet embedded onClose={() => setActiveWorkspace('dashboard')} />
           </div>
         )
-
       case 'storybible':
         return (
           <div className="workspace-fullpage">
             <StoryBible embedded onClose={() => setActiveWorkspace('dashboard')} />
           </div>
         )
-
       case 'brainstorm':
         return (
           <div className="workspace-fullpage">
             <BrainstormCanvas embedded onClose={() => setActiveWorkspace('dashboard')} />
           </div>
         )
-
       case 'cameralibrary':
         return (
           <div className="workspace-fullpage">
             <CameraLibrary embedded onClose={() => setActiveWorkspace('dashboard')} />
           </div>
         )
-
       case 'readthrough':
         return (
           <div className="workspace-fullpage">
             <ReadThroughMode onClose={() => setActiveWorkspace('editor')} />
           </div>
         )
-
       case 'development':
         return (
           <div className="workspace-fullpage">
             <DevelopmentMode embedded onClose={() => setActiveWorkspace('dashboard')} />
           </div>
         )
-
       default:
         return <Dashboard />
     }
   }
 
   const isFocus = layoutMode === 'focus'
+  const chatPanelStyle = chatExpanded
+    ? { width: '50%', minWidth: 320, maxWidth: '50%', flexShrink: 0 }
+    : undefined
 
   return (
     <div className="app-shell-v2">
@@ -153,7 +163,6 @@ export default function AppShell() {
           <TopBar onPanic={handlePanicExport} />
         </div>
       )}
-
       <div className="app-body">
         {!isFocus && (
           <div className={`nav-rail-slot ${navRailOpen ? 'nav-rail-slot--expanded' : 'nav-rail-slot--compact'}`}>
@@ -163,18 +172,19 @@ export default function AppShell() {
         <div className="app-content">
           {renderWorkspace()}
         </div>
-
         {!isFocus && showChat && (
-          <div className="global-chat-panel">
-            <ChatPanel />
+          <div className="global-chat-panel" style={chatPanelStyle}>
+            <ChatPanel
+              expanded={chatExpanded}
+              onToggleExpand={() => setChatExpanded(v => !v)}
+              onPopOut={handleChatPopOut}
+            />
           </div>
         )}
       </div>
-
       <div className="statusbar-slot">
         <StatusBar onPanic={handlePanicExport} />
       </div>
-
       {showAnalysis && <SceneAnalysis onClose={() => setShowAnalysis(false)} />}
       {showDialogueCoach && <DialogueCoach onClose={() => setShowDialogueCoach(false)} />}
       {showExport && <ExportModal onClose={() => setShowExport(false)} />}

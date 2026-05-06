@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import useStore from '../store'
 
-export default function ChatPanel() {
+export default function ChatPanel({ expanded = false, onToggleExpand, onPopOut }) {
   const {
     currentProject,
     currentDocument,
@@ -434,6 +434,31 @@ export default function ChatPanel() {
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>Sonnet</span>
+
+          {onToggleExpand && (
+            <button
+              className="btn btn-ghost btn-sm"
+              type="button"
+              onClick={onToggleExpand}
+              title={expanded ? 'Collapse chat panel' : 'Expand chat panel'}
+              style={{ fontSize: 13, padding: '2px 6px', color: 'var(--text-muted)' }}
+            >
+              {expanded ? '↥' : '↤'}
+            </button>
+          )}
+
+          {onPopOut && (
+            <button
+              className="btn btn-ghost btn-sm"
+              type="button"
+              onClick={onPopOut}
+              title="Open transcript in separate window"
+              style={{ fontSize: 13, padding: '2px 6px', color: 'var(--text-muted)' }}
+            >
+              ↗
+            </button>
+          )}
+
           <button
             className="btn btn-ghost btn-sm"
             onClick={startSaveChatNaming}

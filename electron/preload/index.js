@@ -99,6 +99,9 @@ contextBridge.exposeInMainWorld('api', {
   openFolderDialog: () => ipcRenderer.invoke('dialog:open-folder'),
   openPath: (p) => ipcRenderer.invoke('shell:open-path', p),
 
+  // Chat pop-out
+  openChatPopout: (data) => ipcRenderer.invoke('chat:open-popout', data),
+
   // Menu events from main process
   onMenu: (channel, callback) => {
     const validChannels = [

@@ -4,6 +4,7 @@ const { is } = require('@electron-toolkit/utils')
 const { registerChatSessionHandlers } = require('./ipc-chat-sessions')
 
 let mainWindow = null
+let popoutWindow = null
 let currentProjectId = null
 
 function createWindow() {
@@ -248,3 +249,39 @@ ipcMain.handle('dialog:open-folder', async () => {
 })
 
 ipcMain.handle('shell:open-path', (e, p) => shell.openPath(p))
+
+// Chat pop-out (display-only transcript window)
+ipcMain.handle('chat:open-popout', (e, { projectId, sessionId }) => {
+  if (popoutWindow && !popoutWindow.isDestroyed()) {
+    popoutWindow.focus()
+    return
+  }
+  popoutWindow = new BrowserWindow({
+    width: 560,
+    height: 780,
+    minWidth: 400,
+    minHeight: 500,
+    title: 'Chat — Slugline',
+    titleBarStyle: 'hiddenInset',
+    trafficLightPosition: { x: 16, y: 16 },
+    backgroundColor: '#0D0D0F',
+    show: false,
+    webPreferences: {
+      preload: path.join(__dirname, '../preload/index.js'),
+      sandbox: false,
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  })
+  if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
+    popoutWindow.loadURL(
+      `${process.env['ELECTRON_RENDERER_URL']}?popout=1&projectId=${projectId}&sessionId=${sessionId}`
+    )
+  } else {
+    popoutWindow.loadFile(path.join(__dirname, '../renderer/index.html'), {
+      query: { popout: '1', projectId: String(projectId), sessionId: String(sessionId) }
+    })
+  }
+  popoutWindow.once('ready-to-show', () => popoutWindow.show())
+  popoutWindow.on('closed', () => { popoutWindow = null })
+})
