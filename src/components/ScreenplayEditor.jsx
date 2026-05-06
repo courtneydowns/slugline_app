@@ -527,8 +527,31 @@ export default function ScreenplayEditor({ onOpenDocuments }) {
   }
 
   async function handleCut(e, block, index) {
-    if (selectedBlockIds.length === 0) return
+    // Single-block in-text cut: explicit clipboard write + cursor-safe state update
+    if (selectedBlockIds.length === 0) {
+      const textarea = refs.current[block.id]
+      if (!textarea) return
+      const start = textarea.selectionStart
+      const end = textarea.selectionEnd
+      if (start === end) return  // no text selected; nothing to cut
 
+      e.preventDefault()
+      const selectedText = textarea.value.substring(start, end)
+
+      // Write to clipboard (both paths for Electron/browser compatibility)
+      try { await navigator.clipboard.writeText(selectedText) } catch (_) {}
+
+      // Remove the selected text and restore cursor at the cut point
+      const newText = textarea.value.substring(0, start) + textarea.value.substring(end)
+      const detected = detectType(newText)
+      const nextBlocks = blocks.map(b =>
+        b.id === block.id ? { ...b, text: newText, type: detected || b.type } : b
+      )
+      commitBlocks(nextBlocks, { focusId: block.id, focusPosition: start })
+      return
+    }
+
+    // Multi-block selection cut (unchanged)
     const text = selectedBlocksToText()
     if (!text) return
 
@@ -545,10 +568,25 @@ export default function ScreenplayEditor({ onOpenDocuments }) {
     const text = e.clipboardData?.getData('text/plain') || ''
     if (!text.trim()) return
 
-    if (selectedBlockIds.length > 0 || text.includes('\n')) {
+    // Single-line paste with no multi-block selection:
+    // Insert at the exact cursor position within the focused block.
+    if (!text.includes('\n') && selectedBlockIds.length === 0) {
       e.preventDefault()
-      insertTextAsBlocks(text, block, index)
+      const textarea = refs.current[block.id]
+      const start = textarea ? textarea.selectionStart : block.text.length
+      const end   = textarea ? textarea.selectionEnd   : block.text.length
+      const newText = block.text.substring(0, start) + text + block.text.substring(end)
+      const detected = detectType(newText)
+      const nextBlocks = blocks.map(b =>
+        b.id === block.id ? { ...b, text: newText, type: detected || b.type } : b
+      )
+      commitBlocks(nextBlocks, { focusId: block.id, focusPosition: start + text.length })
+      return
     }
+
+    // Multiline paste or multi-block selection replacement
+    e.preventDefault()
+    insertTextAsBlocks(text, block, index)
   }
 
   function updateBlock(id, text) {
