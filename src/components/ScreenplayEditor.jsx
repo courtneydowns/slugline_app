@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react'
-import useStore from '../store'
+import useStore, { _setLastActiveScreenplayDocId } from '../store'
 
 const ELEMENT_TYPES = ['scene-heading', 'action', 'character', 'dialogue', 'parenthetical', 'transition', 'shot', 'note']
 const ELEMENT_LABELS = {
@@ -234,12 +234,30 @@ export default function ScreenplayEditor({ onOpenDocuments }) {
   useEffect(() => {
     if (!currentDocument || isScreenplayDocument(currentDocument)) return
 
-    const fallback = screenplayDocuments[0] || null
+    // currentDocument is not a screenplay (e.g. a note or chat export opened
+    // from DocumentsWorkspace). Redirect to the most-recently-updated screenplay
+    // doc rather than blindly taking index [0].
+    const fallback = screenplayDocuments.length > 0
+      ? screenplayDocuments.reduce((best, d) =>
+          new Date(d.updated_at || 0) > new Date(best.updated_at || 0) ? d : best
+        )
+      : null
     if (fallback && fallback.id !== currentDocument.id) {
       setCurrentDocument(fallback)
       addNotification?.(`Returned to screenplay document: ${fallback.title || 'Untitled'}.`, 'info')
     }
   }, [currentDocument?.id, currentDocument?.document_type, screenplayDocuments])
+
+  // ── Phase 1: persist last active screenplay doc per project ───────────────
+  // Fires whenever the active document or project changes. Guards ensure we
+  // only write when the active document is genuinely a screenplay so notes /
+  // chat exports never stomp the saved screenplay pointer.
+  useEffect(() => {
+    if (!currentDocument || !currentProject) return
+    if (!isScreenplayDocument(currentDocument)) return
+    _setLastActiveScreenplayDocId(currentProject.id, currentDocument.id)
+  }, [currentDocument?.id, currentProject?.id])
+  // ─────────────────────────────────────────────────────────────────────────
 
   // Load document content into blocks
   useEffect(() => {

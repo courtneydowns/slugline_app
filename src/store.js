@@ -1,5 +1,39 @@
 import { create } from 'zustand'
 
+// ─── Phase 1: last-active screenplay doc persistence ──────────────────────────
+// These helpers are module-level so both openProject (store) and
+// ScreenplayEditor can share the same localStorage key scheme without
+// circular imports.
+
+function _isChatExportDoc(doc) {
+  const title   = doc?.title   || ''
+  const content = doc?.content || ''
+  if (title.startsWith('Chat Export')) return true
+  if (/\nChat: .+\nExported: /m.test(content)) return true
+  if (content.includes('\n## User\n\n') || content.includes('\n## Assistant\n\n')) return true
+  return false
+}
+
+function _isScreenplayDoc(doc) {
+  return !!doc && (doc.document_type || 'screenplay') === 'screenplay' && !_isChatExportDoc(doc)
+}
+
+function _getLastActiveScreenplayDocId(projectId) {
+  try {
+    const raw = localStorage.getItem(`slugline:lastScreenplay:${projectId}`)
+    const id  = raw ? Number(raw) : NaN
+    return Number.isFinite(id) && id > 0 ? id : null
+  } catch { return null }
+}
+
+export function _setLastActiveScreenplayDocId(projectId, docId) {
+  try {
+    if (projectId && docId) localStorage.setItem(`slugline:lastScreenplay:${projectId}`, String(docId))
+  } catch {}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 const useStore = create((set, get) => ({
   // ─── App state ─────────────────────────────────────────────────────────────
   ready: false,
@@ -40,7 +74,30 @@ const useStore = create((set, get) => ({
   openProject: async (projectId) => {
     const project = await window.api.getProject(projectId)
     const docs    = await window.api.getAllDocuments(projectId)
-    set({ currentProject: project, documents: docs, currentDocument: docs[0] || null })
+
+    // ── Phase 1: restore last active screenplay document ──────────────────
+    // Collect screenplay docs (exclude chat exports and non-screenplay types).
+    const screenplayDocs = docs.filter(_isScreenplayDoc)
+
+    // Prefer the doc the user was last editing for this project.
+    const storedId  = _getLastActiveScreenplayDocId(projectId)
+    let initialDoc  = storedId
+      ? (screenplayDocs.find(d => d.id === storedId) || null)
+      : null
+
+    // If nothing stored (or stale id), fall back to most-recently-updated screenplay.
+    if (!initialDoc && screenplayDocs.length > 0) {
+      initialDoc = screenplayDocs.reduce((best, d) =>
+        new Date(d.updated_at || 0) > new Date(best.updated_at || 0) ? d : best
+      )
+    }
+
+    // Last resort: first document of any type (preserves pre-Phase-1 behaviour
+    // for projects that have no screenplay documents yet).
+    if (!initialDoc) initialDoc = docs[0] || null
+    // ─────────────────────────────────────────────────────────────────────
+
+    set({ currentProject: project, documents: docs, currentDocument: initialDoc })
     await get().loadProjectData(projectId)
     return project
   },
