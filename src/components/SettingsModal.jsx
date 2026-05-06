@@ -9,7 +9,8 @@ export default function SettingsModal({ onClose }) {
     primaryBackupPath: preferences.primaryBackupPath || '',
     secondaryBackupPath: preferences.secondaryBackupPath || '',
     autoSnapshotEnabled: preferences.autoSnapshotEnabled !== false,
-    soundEnabled: preferences.soundEnabled !== false
+    soundEnabled: preferences.soundEnabled !== false,
+    launchFullscreen: preferences.launchFullscreen ?? false
   })
   const [changingKey, setChangingKey] = useState(false)
   const [newKey, setNewKey] = useState('')
@@ -118,6 +119,13 @@ export default function SettingsModal({ onClose }) {
               </Field>
             </div>
           )}
+
+ <Field label="Window Launch">
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={form.launchFullscreen} onChange={e => setForm(f => ({ ...f, launchFullscreen: e.target.checked }))} />
+                  <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Launch maximized</span>
+                </label>
+              </Field>
 
           {tab === 'backup' && (
             <div>

@@ -100,7 +100,7 @@ function migrateSessionSummaries(database) {
   database.exec(`
     CREATE TABLE IF NOT EXISTS session_summaries (
       id              INTEGER PRIMARY KEY AUTOINCREMENT,
-      project_id      INTEGER NOT NULL,
+      project_id      INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
       chat_session_id INTEGER NOT NULL UNIQUE,
       summary         TEXT    NOT NULL,
       created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -146,7 +146,10 @@ function updateProject(id, data) {
 }
 
 function deleteProject(id) {
-  return getDb().prepare('DELETE FROM projects WHERE id = ?').run(id)
+  const db = getDb()
+  db.prepare('DELETE FROM session_summaries WHERE project_id = ?').run(id)
+  db.prepare('DELETE FROM token_usage WHERE project_id = ?').run(id)
+  return db.prepare('DELETE FROM projects WHERE id = ?').run(id)
 }
 
 // ─── Documents ───────────────────────────────────────────────────────────────

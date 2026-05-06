@@ -142,7 +142,7 @@ CREATE TABLE IF NOT EXISTS writing_sessions (
 
 CREATE TABLE IF NOT EXISTS token_usage (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  project_id INTEGER REFERENCES projects(id),
+  project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE,
   model TEXT NOT NULL,
   feature TEXT NOT NULL,
   input_tokens INTEGER DEFAULT 0,
