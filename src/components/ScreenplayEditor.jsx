@@ -1410,8 +1410,7 @@ function BlockLine({ block, blockIndex, lineNumber, focused, selected, inputRef,
     'action': { marginBottom: '0.5em' },
     'character': { marginLeft: '2.0in', marginTop: '1em', textTransform: 'uppercase' },
     'dialogue': { marginLeft: '1.0in', marginRight: '0.5in' },
-    'parenthetical': { marginLeft: '1.5in', marginRight: '0.5in' },
-    'transition': { textAlign: 'right', textTransform: 'uppercase', marginTop: '1em' },
+'parenthetical': { marginLeft: '1.5in', marginRight: '1.5in' },    'transition': { textAlign: 'right', textTransform: 'uppercase', marginTop: '1em' },
     'shot': { textTransform: 'uppercase', marginTop: '1em', fontWeight: 600 },
     'note': { color: 'var(--text-muted)', fontStyle: 'italic' }
   }
