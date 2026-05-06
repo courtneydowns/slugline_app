@@ -38,6 +38,10 @@ function createWindow() {
       height: workArea.height
     })
     mainWindow.show()
+    const prefs = config.getPreferences()
+    if (prefs.launchFullscreen) {
+      mainWindow.maximize()
+    }
   })
 
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
