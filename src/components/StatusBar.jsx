@@ -1,18 +1,28 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import useStore from '../store'
 
 export default function StatusBar() {
   const {
     currentProject, currentDocument, sessionStart, sessionDuration,
     sessionPages, pageGoal, startSession, tickSession,
-    setSessionPages, addNotification
+    setSessionPages, setPageGoal, preferences
   } = useStore()
 
   const tickRef = useRef(null)
+  const [editingGoal, setEditingGoal] = useState(false)
+  const [goalDraft, setGoalDraft] = useState('')
+  const goalInputRef = useRef(null)
 
+  // Start session timer on mount; load persisted pageGoal from preferences
   useEffect(() => {
     if (!sessionStart) startSession()
     tickRef.current = setInterval(() => tickSession(), 10000)
+
+    const saved = preferences?.pageGoal
+    if (saved && Number.isFinite(saved) && saved > 0) {
+      setPageGoal(saved)
+    }
+
     return () => clearInterval(tickRef.current)
   }, [])
 
@@ -23,11 +33,41 @@ export default function StatusBar() {
     }
   }, [currentDocument?.page_count])
 
+  // Focus input when goal editing opens
+  useEffect(() => {
+    if (editingGoal && goalInputRef.current) {
+      goalInputRef.current.focus()
+      goalInputRef.current.select()
+    }
+  }, [editingGoal])
+
   const formatTime = (secs) => {
     const h = Math.floor(secs / 3600)
     const m = Math.floor((secs % 3600) / 60)
     if (h > 0) return `${h}h ${m}m`
     return `${m}m`
+  }
+
+  const openGoalEdit = () => {
+    setGoalDraft(String(pageGoal))
+    setEditingGoal(true)
+  }
+
+  const commitGoal = async () => {
+    setEditingGoal(false)
+    const n = parseFloat(goalDraft)
+    if (!Number.isFinite(n) || n <= 0) return
+    setPageGoal(n)
+    try {
+      await window.api.setPreferences({ ...preferences, pageGoal: n })
+    } catch (e) {
+      console.warn('StatusBar: failed to persist pageGoal', e)
+    }
+  }
+
+  const onGoalKeyDown = (e) => {
+    if (e.key === 'Enter') commitGoal()
+    if (e.key === 'Escape') setEditingGoal(false)
   }
 
   const goalPct = pageGoal > 0 ? Math.min(100, (sessionPages / pageGoal) * 100) : 0
@@ -72,16 +112,51 @@ export default function StatusBar() {
       <span>⏱ {formatTime(sessionDuration)}</span>
 
       {/* Page goal */}
-      {pageGoal > 0 && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        {pageGoal > 0 && (
           <div className="token-bar" style={{ width: 60, height: 3 }}>
             <div className="token-bar-fill" style={{ width: `${goalPct}%`, background: goalMet ? 'var(--green)' : 'var(--amber)' }} />
           </div>
-          <span style={{ color: goalMet ? 'var(--green)' : 'var(--text-muted)' }}>
-            {goalMet ? '✓ Goal met' : `${sessionPages.toFixed(1)}/${pageGoal}p goal`}
+        )}
+
+        {editingGoal ? (
+          <input
+            ref={goalInputRef}
+            type="number"
+            min="0.5"
+            step="0.5"
+            value={goalDraft}
+            onChange={e => setGoalDraft(e.target.value)}
+            onBlur={commitGoal}
+            onKeyDown={onGoalKeyDown}
+            style={{
+              width: 36,
+              fontSize: 11,
+              background: 'var(--bg-elevated)',
+              border: '1px solid var(--border)',
+              borderRadius: 3,
+              color: 'var(--text-primary)',
+              padding: '0 3px',
+              height: 18,
+              userSelect: 'text'
+            }}
+          />
+        ) : (
+          <span
+            onClick={openGoalEdit}
+            title="Click to set page goal"
+            style={{
+              cursor: 'pointer',
+              color: goalMet ? 'var(--green)' : 'var(--text-muted)',
+              borderBottom: '1px dashed var(--border-subtle)'
+            }}
+          >
+            {pageGoal > 0
+              ? (goalMet ? '✓ Goal met' : `${sessionPages.toFixed(1)}/${pageGoal}p goal`)
+              : 'Set goal'}
           </span>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Format */}
       {currentProject && (
