@@ -213,6 +213,16 @@ export default function TopBar({ onPanic }) {
           >
             <span style={{ fontSize: 13 }}>◑</span>
           </button>
+
+          {onPanic && (
+            <button
+              className="topbar-icon-btn"
+              onClick={onPanic}
+              title="Panic Export (⌘⇧P)"
+            >
+              <span style={{ fontSize: 13 }}>⚡</span>
+            </button>
+          )}
         </div>
       </div>
 

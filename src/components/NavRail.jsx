@@ -16,7 +16,7 @@ const SECONDARY_ITEMS = [
   { id: 'development', icon: '🎬', label: 'Development' },
 ]
 
-export default function NavRail({ onPanic }) {
+export default function NavRail() {
   const {
     activeWorkspace, setActiveWorkspace,
     navRailOpen,
@@ -93,19 +93,7 @@ export default function NavRail({ onPanic }) {
         />
       </div>
 
-      {/* Panic */}
-      {expanded && (
-        <div className="nav-rail-panic" onClick={onPanic}>
-          <span>⚡</span>
-          <span>Panic Export</span>
-          <span style={{ marginLeft: 'auto', fontSize: 10, opacity: 0.5 }}>⌘⇧P</span>
-        </div>
-      )}
-      {!expanded && (
-        <div className="nav-rail-panic nav-rail-panic--compact" onClick={onPanic} title="Panic Export">
-          ⚡
-        </div>
-      )}
+
     </div>
   )
 }

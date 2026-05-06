@@ -279,8 +279,8 @@ export default function DocumentsWorkspace({ onClose }) {
 
       addNotification(
         creatingKind === 'screenplay'
-          ? `Created screenplay document: ${title}.`
-          : `Created project document: ${title}.`,
+          ? `Created script draft: ${title}.`
+          : `Created notes document: ${title}.`,
         'success'
       )
       cancelCreateDocument()
@@ -374,6 +374,27 @@ export default function DocumentsWorkspace({ onClose }) {
       addNotification(`Renamed document to ${title}.`, 'success')
     } catch (err) {
       addNotification('Could not rename document: ' + err.message, 'error')
+    }
+  }
+
+  async function duplicateChatExport(doc) {
+    if (!currentProject || !doc?.id) return
+    try {
+      const newTitle = `${doc.title || 'Chat Export'} — Copy`
+      const created = await window.api.createDocument({
+        project_id: currentProject.id,
+        title: newTitle,
+        content: doc.content || '',
+        document_type: 'project-document'
+      })
+      const docs = await refreshDocuments()
+      const fresh = docs.find(d => d.id === created.id) || created
+      setOpenedDocument(fresh)
+      setEditingContent(fresh.content || '')
+      latestEditingContentRef.current = fresh.content || ''
+      addNotification(`Duplicated as editable document: ${newTitle}.`, 'success')
+    } catch (err) {
+      addNotification('Could not duplicate document: ' + err.message, 'error')
     }
   }
 
@@ -560,14 +581,16 @@ export default function DocumentsWorkspace({ onClose }) {
           </div>
 
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
-            <button
-              type="button"
-              className="btn btn-primary no-drag"
-              onClick={saveDocumentContent}
-              disabled={savingContent}
-            >
-              {savingContent ? 'Saving…' : 'Save Document'}
-            </button>
+            {openedDocument.document_type !== 'chat-export' && (
+              <button
+                type="button"
+                className="btn btn-primary no-drag"
+                onClick={saveDocumentContent}
+                disabled={savingContent}
+              >
+                {savingContent ? 'Saving…' : 'Save Document'}
+              </button>
+            )}
             <button
               type="button"
               className="btn btn-secondary no-drag"
@@ -583,7 +606,8 @@ export default function DocumentsWorkspace({ onClose }) {
           <textarea
             className="input selectable"
             value={editingContent}
-            onChange={e => { setEditingContent(e.target.value); latestEditingContentRef.current = e.target.value }}
+            onChange={openedDocument.document_type === 'chat-export' ? undefined : e => { setEditingContent(e.target.value); latestEditingContentRef.current = e.target.value }}
+            readOnly={openedDocument.document_type === 'chat-export'}
             placeholder={openedDocument.document_type === 'chat-export' ? 'Saved chat transcript' : 'Write project notes here...'}
             style={{
               width: '100%',
@@ -592,7 +616,8 @@ export default function DocumentsWorkspace({ onClose }) {
               fontFamily: 'var(--font-mono)',
               fontSize: 13,
               lineHeight: 1.6,
-              padding: 14
+              padding: 14,
+              ...(openedDocument.document_type === 'chat-export' && { opacity: 0.8, cursor: 'default' })
             }}
           />
         </div>
@@ -995,6 +1020,20 @@ export default function DocumentsWorkspace({ onClose }) {
                       title="Open in Screenplay"
                     >
                       Open in Screenplay
+                    </button>
+                  )}
+                  {isChatExport && renamingId !== doc.id && (
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm no-drag"
+                      onClick={e => {
+                        e.stopPropagation()
+                        duplicateChatExport(doc)
+                      }}
+                      disabled={isDeleting}
+                      title="Duplicate as an editable project document"
+                    >
+                      Duplicate &amp; Edit
                     </button>
                   )}
                   {renamingId !== doc.id && (

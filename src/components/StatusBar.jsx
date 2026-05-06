@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react'
 import useStore from '../store'
 
-export default function StatusBar({ onPanic }) {
+export default function StatusBar() {
   const {
     currentProject, currentDocument, sessionStart, sessionDuration,
     sessionPages, pageGoal, startSession, tickSession,

@@ -151,6 +151,8 @@ export default function ScreenplayEditor({ onOpenDocuments }) {
   const undoStackRef = useRef([])
   const redoStackRef = useRef([])
   const historyHydratingRef = useRef(false)
+  const typingHistoryTimerRef = useRef(null)  // debounce handle for typing history
+  const preTypingSnapshotRef  = useRef(null)  // blocks snapshot before current typing burst
   const [historyVersion, setHistoryVersion] = useState(0)
 
   function isSavedChatExport(doc) {
@@ -398,12 +400,29 @@ export default function ScreenplayEditor({ onOpenDocuments }) {
       recordHistory = true
     } = options
 
+    // Snapshot focusId NOW, before any state changes, so the undo entry records
+    // which block the user was in at the moment of this operation.
+    const snapshotFocusId = focusedId
+
+    // Flush any pending typing-burst checkpoint before recording a structural change.
+    // This ensures "type hello → immediately press Enter" produces two distinct undo
+    // steps: one for "hello" and one for the Enter, rather than losing the "hello" step.
+    if (recordHistory && typingHistoryTimerRef.current) {
+      clearTimeout(typingHistoryTimerRef.current)
+      typingHistoryTimerRef.current = null
+      if (preTypingSnapshotRef.current) {
+        undoStackRef.current = [...undoStackRef.current.slice(-49), preTypingSnapshotRef.current]
+        preTypingSnapshotRef.current = null
+      }
+    }
+
     resetPromptTimer()
     window.dispatchEvent(new CustomEvent('slugline:save', { detail: 'saving' }))
 
     setBlocks(currentBlocks => {
       if (recordHistory && !historyHydratingRef.current) {
-        undoStackRef.current = [...undoStackRef.current.slice(-49), cloneBlocks(currentBlocks)]
+        // Store {blocks, focusId} so undo can restore the exact block the user was in.
+        undoStackRef.current = [...undoStackRef.current.slice(-49), { blocks: cloneBlocks(currentBlocks), focusId: snapshotFocusId }]
         redoStackRef.current = []
         setHistoryVersion(v => v + 1)
       }
@@ -426,13 +445,15 @@ export default function ScreenplayEditor({ onOpenDocuments }) {
   }
 
   function handleUndo() {
-    const previous = undoStackRef.current.pop()
-    if (!previous) return
+    const entry = undoStackRef.current.pop()
+    if (!entry) return
 
-    redoStackRef.current = [...redoStackRef.current.slice(-49), cloneBlocks(blocks)]
+    redoStackRef.current = [...redoStackRef.current.slice(-49), { blocks: cloneBlocks(blocks), focusId: focusedId }]
     setHistoryVersion(v => v + 1)
-    const nextBlocks = cloneBlocks(previous)
-    const nextFocus = nextBlocks.find(b => b.id === focusedId) || nextBlocks[0]
+    const nextBlocks = cloneBlocks(entry.blocks)
+    // Restore the block that had focus when this undo entry was recorded.
+    // Fall back to the last block (not first) if that block no longer exists.
+    const nextFocus = nextBlocks.find(b => b.id === entry.focusId) || nextBlocks[nextBlocks.length - 1]
 
     resetPromptTimer()
     window.dispatchEvent(new CustomEvent('slugline:save', { detail: 'saving' }))
@@ -444,7 +465,7 @@ export default function ScreenplayEditor({ onOpenDocuments }) {
         const el = refs.current[nextFocus.id]
         if (el) {
           el.focus()
-          el.setSelectionRange(0, 0)
+          el.setSelectionRange(el.value.length, el.value.length)
           setFocusedBlock(nextFocus.id)
         }
       }, 0)
@@ -452,13 +473,13 @@ export default function ScreenplayEditor({ onOpenDocuments }) {
   }
 
   function handleRedo() {
-    const next = redoStackRef.current.pop()
-    if (!next) return
+    const entry = redoStackRef.current.pop()
+    if (!entry) return
 
-    undoStackRef.current = [...undoStackRef.current.slice(-49), cloneBlocks(blocks)]
+    undoStackRef.current = [...undoStackRef.current.slice(-49), { blocks: cloneBlocks(blocks), focusId: focusedId }]
     setHistoryVersion(v => v + 1)
-    const nextBlocks = cloneBlocks(next)
-    const nextFocus = nextBlocks.find(b => b.id === focusedId) || nextBlocks[0]
+    const nextBlocks = cloneBlocks(entry.blocks)
+    const nextFocus = nextBlocks.find(b => b.id === entry.focusId) || nextBlocks[nextBlocks.length - 1]
 
     resetPromptTimer()
     window.dispatchEvent(new CustomEvent('slugline:save', { detail: 'saving' }))
@@ -470,7 +491,7 @@ export default function ScreenplayEditor({ onOpenDocuments }) {
         const el = refs.current[nextFocus.id]
         if (el) {
           el.focus()
-          el.setSelectionRange(0, 0)
+          el.setSelectionRange(el.value.length, el.value.length)
           setFocusedBlock(nextFocus.id)
         }
       }, 0)
@@ -549,7 +570,11 @@ export default function ScreenplayEditor({ onOpenDocuments }) {
       e.preventDefault()
       const selectedText = textarea.value.substring(start, end)
 
-      // Write to clipboard (both paths for Electron/browser compatibility)
+      // Write to clipboard — synchronous clipboardData path first (reliable in
+      // Electron on macOS), async navigator.clipboard as backup.
+      if (e.clipboardData) {
+        e.clipboardData.setData('text/plain', selectedText)
+      }
       try { await navigator.clipboard.writeText(selectedText) } catch (_) {}
 
       // Remove the selected text and restore cursor at the cut point
@@ -606,7 +631,27 @@ export default function ScreenplayEditor({ onOpenDocuments }) {
       if (b.id !== id) return b
       return { ...b, text, type: detected || b.type }
     })
-    commitBlocks(nextBlocks, { recordHistory: true })
+
+    // Debounced history: capture a snapshot before the first character in this
+    // typing burst, then commit it to the undo stack after 600 ms of inactivity.
+    // Structural operations (Enter, Backspace-delete, etc.) call commitBlocks with
+    // recordHistory:true, which flushes this timer first so the typing snapshot
+    // lands as its own undo step before the structural one.
+    if (!typingHistoryTimerRef.current) {
+      preTypingSnapshotRef.current = { blocks: cloneBlocks(blocks), focusId: focusedId }
+    }
+    clearTimeout(typingHistoryTimerRef.current)
+    typingHistoryTimerRef.current = setTimeout(() => {
+      typingHistoryTimerRef.current = null
+      if (preTypingSnapshotRef.current) {
+        undoStackRef.current = [...undoStackRef.current.slice(-49), preTypingSnapshotRef.current]
+        redoStackRef.current = []
+        preTypingSnapshotRef.current = null
+        setHistoryVersion(v => v + 1)
+      }
+    }, 600)
+
+    commitBlocks(nextBlocks, { recordHistory: false })
   }
 
   function changeBlockType(blockId, type) {
@@ -626,12 +671,6 @@ export default function ScreenplayEditor({ onOpenDocuments }) {
   function removeBlock(blockId) {
     const target = blocks.find(b => b.id === blockId)
     if (!target) return
-
-    // Non-empty: confirm before destroying content
-    if (target.text.trim().length > 0) {
-      const ok = window.confirm('Remove this block and its text?')
-      if (!ok) return
-    }
 
     // Never leave zero blocks
     if (blocks.length <= 1) {
@@ -731,7 +770,7 @@ export default function ScreenplayEditor({ onOpenDocuments }) {
     commitBlocks(nextBlocks, {
       selectedIds: [],
       focusId: nextFocus.id,
-      focusPosition: 0
+      focusPosition: 'end'
     })
 
     return true
@@ -758,6 +797,16 @@ export default function ScreenplayEditor({ onOpenDocuments }) {
     if ((e.key === 'Delete' || e.key === 'Backspace') && selectedBlockIds.length > 0) {
       e.preventDefault()
       deleteSelectedBlocks(block, index)
+      return
+    }
+
+    // Delete on empty focused block — remove it and focus the next block
+    // (forward direction, consistent with Delete = delete-forward semantics).
+    if (e.key === 'Delete' && !block.text && blocks.length > 1) {
+      e.preventDefault()
+      const nextBlock = blocks[index + 1] ?? blocks[index - 1]
+      const nextBlocks = blocks.filter(b => b.id !== block.id)
+      commitBlocks(nextBlocks, { focusId: nextBlock?.id, focusPosition: 0 })
       return
     }
 
