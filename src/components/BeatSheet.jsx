@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react'
 import useStore from '../store'
 
 const ACT_LABELS = {
-  act1: 'Act One', act2a: 'Act Two A', act2b: 'Act Two B', act3: 'Act Three',
-  teaser: 'Teaser', tag: 'Tag'
+  act1: 'Act One', act2: 'Act Two', act2a: 'Act Two A', act2b: 'Act Two B',
+  act3: 'Act Three', teaser: 'Teaser', tag: 'Tag'
 }
 const ACT_COLORS = {
-  act1: 'var(--blue)', act2a: 'var(--amber)', act2b: '#B07AC8',
+  act1: 'var(--blue)', act2: 'var(--amber)', act2a: 'var(--amber)', act2b: '#B07AC8',
   act3: 'var(--green)', teaser: 'var(--text-muted)', tag: 'var(--text-muted)'
 }
 
@@ -25,28 +25,50 @@ export default function BeatSheet({ onClose, embedded }) {
   }, [])
 
   async function saveEdit() {
-    const updated = await window.api.upsertBeat(editData)
-    setBeats(beats.map(b => b.id === updated.id ? updated : b))
-    setEditing(null)
+    try {
+      const updated = await window.api.upsertBeat(editData)
+      setBeats(beats.map(b => b.id === updated.id ? updated : b))
+      setEditing(null)
+    } catch (err) {
+      addNotification('Failed to save beat. Please try again.', 'error')
+    }
   }
 
   async function markComplete() {
-    // Mark beat sheet as complete in project
-    await window.api.updateProject(currentProject.id, { beat_sheet_complete: 1 })
-    useStore.getState().setCurrentProject({ ...currentProject, beat_sheet_complete: 1 })
-    addNotification('Beat sheet locked in! You can now write freely.', 'success')
-    onClose()
+    try {
+      await window.api.updateProject(currentProject.id, { beat_sheet_complete: 1 })
+      useStore.getState().setCurrentProject({ ...currentProject, beat_sheet_complete: 1 })
+      addNotification('Beat sheet locked in! You can now write freely.', 'success')
+      onClose()
+    } catch (err) {
+      addNotification('Failed to lock beat sheet. Please try again.', 'error')
+    }
   }
 
   async function analyse() {
     setAnalysing(true)
-    const result = await window.api.claudeBeatSheetAnalysis({
-      projectId: currentProject.id,
-      beats,
-      documentContent: currentDocument?.content
-    })
-    setAnalysis(result.analysis)
-    setAnalysing(false)
+    try {
+      // Convert raw JSON blocks to readable screenplay text for the AI.
+      // Falls back to the raw string if content is not a blocks array.
+      let scriptText = currentDocument?.content || ''
+      try {
+        const blocks = JSON.parse(scriptText)
+        if (Array.isArray(blocks)) {
+          scriptText = blocks.map(b => b.content || '').filter(Boolean).join('\n')
+        }
+      } catch { /* not JSON — use raw content as-is */ }
+
+      const result = await window.api.claudeBeatSheetAnalysis({
+        projectId: currentProject.id,
+        beats,
+        documentContent: scriptText
+      })
+      setAnalysis(result.analysis)
+    } catch (err) {
+      addNotification('Structure analysis failed. Please try again.', 'error')
+    } finally {
+      setAnalysing(false)
+    }
   }
 
   // Group by act
@@ -161,6 +183,15 @@ export default function BeatSheet({ onClose, embedded }) {
                 </div>
                 <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4, lineHeight: 1.5 }}>{analysis.pacing_assessment}</div>
               </div>
+
+              {analysis.missing_beats?.length > 0 && (
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8, textTransform: 'uppercase' }}>Missing Beats</div>
+                  {analysis.missing_beats.map((m, i) => (
+                    <div key={i} style={{ fontSize: 12, color: 'var(--amber)', marginBottom: 4, lineHeight: 1.5 }}>⚠ {m}</div>
+                  ))}
+                </div>
+              )}
 
               {analysis.weak_beats?.length > 0 && (
                 <div style={{ marginBottom: 16 }}>
