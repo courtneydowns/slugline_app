@@ -1490,8 +1490,6 @@ function BlockLine({ block, blockIndex, lineNumber, focused, selected, inputRef,
         }}
         title={`Change L${lineNumber} type: ${ELEMENT_LABELS[block.type]}`}
         style={{
-          opacity: controlsVisible ? 1 : 0,
-          transition: 'opacity 0.15s',
           cursor: 'pointer',
           border: '1px solid var(--border-subtle)',
           borderRadius: 999,

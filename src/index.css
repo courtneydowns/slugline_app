@@ -179,49 +179,6 @@ button,
   min-height: 100%;
 }
 
-/* Screenplay element styles */
-.element-scene-heading {
-  text-transform: uppercase;
-  font-weight: 700;
-  margin-top: 2em;
-  margin-bottom: 0.5em;
-}
-
-.element-action {
-  margin-bottom: 0.5em;
-}
-
-.element-character {
-  text-transform: uppercase;
-  margin-left: 2.0in;
-  margin-top: 1em;
-  margin-bottom: 0;
-}
-
-.element-dialogue {
-  margin-left: 1.0in;
-  margin-right: 0.5in;
-  margin-bottom: 0.5em;
-}
-
-.element-parenthetical {
-  margin-left: 1.5in;
-  margin-right: 0.5in;
-  margin-bottom: 0;
-}
-
-.element-transition {
-  text-transform: uppercase;
-  text-align: right;
-  margin-top: 1em;
-  margin-bottom: 1em;
-}
-
-.element-note {
-  color: var(--text-muted);
-  font-style: italic;
-}
-
 /* Element type indicator pill */
 .element-badge {
   position: absolute;
