@@ -971,11 +971,6 @@ export default function ScreenplayEditor({ onOpenDocuments }) {
   }, [openInsertMenuId, openTypeMenuId])
 
   const focusedBlock = blocks.find(b => b.id === focusedId)
-  const insertTargetIndex = blocks.findIndex(b => b.id === openInsertMenuId)
-  const insertTargetBlock = insertTargetIndex >= 0 ? blocks[insertTargetIndex] : null
-  const typeTargetIndex = blocks.findIndex(b => b.id === openTypeMenuId)
-  const typeTargetBlock = typeTargetIndex >= 0 ? blocks[typeTargetIndex] : null
-  const inspectorOpen = !!typeTargetBlock || !!insertTargetBlock
   const canUndo = undoStackRef.current.length > 0
   const canRedo = redoStackRef.current.length > 0
   void historyVersion
@@ -1058,160 +1053,6 @@ export default function ScreenplayEditor({ onOpenDocuments }) {
             </div>
           </div>
 
-          {(typeTargetBlock || insertTargetBlock) && (
-            <div
-              data-screenplay-floating-panel
-              className="selectable"
-              style={{
-                position: 'sticky',
-                top: 12,
-                zIndex: 18,
-                margin: '-20px auto 18px',
-                padding: '0 18px',
-                boxSizing: 'border-box'
-              }}
-            >
-              {typeTargetBlock && (
-                <div
-                  data-screenplay-floating-panel
-                  className="selectable"
-                  style={{
-                    width: '100%',
-                    maxHeight: 260,
-                    overflowY: 'auto',
-                    border: '1px solid var(--border-subtle)',
-                    borderRadius: 12,
-                    background: 'var(--bg-panel)',
-                    boxShadow: 'var(--shadow-lg)',
-                    padding: 10
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 10 }}>
-                    <div>
-                      <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 3 }}>
-                        Change type
-                      </div>
-                      <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                        Line L{typeTargetIndex + 1}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      className="btn btn-ghost btn-sm"
-                      onClick={() => setOpenTypeMenuId(null)}
-                      title="Close type menu"
-                      style={{ height: 24, padding: '0 8px', borderRadius: 999 }}
-                    >
-                      Close ×
-                    </button>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                    {ELEMENT_TYPES.map(type => (
-                      <button
-                        key={type}
-                        type="button"
-                        className={`btn ${typeTargetBlock.type === type ? 'btn-primary' : 'btn-ghost'} btn-sm`}
-                        onClick={() => changeBlockType(typeTargetBlock.id, type)}
-                        title={`Change L${typeTargetIndex + 1} to ${ELEMENT_LABELS[type]}`}
-                        style={{
-                          minHeight: 30,
-                          height: 'auto',
-                          padding: '6px 8px',
-                          justifyContent: 'flex-start',
-                          whiteSpace: 'normal',
-                          lineHeight: 1.15,
-                          textAlign: 'left'
-                        }}
-                      >
-                        {ELEMENT_LABELS[type]}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {insertTargetBlock && (
-                <div
-                  data-screenplay-floating-panel
-                  className="selectable"
-                  style={{
-                    width: '100%',
-                    maxHeight: 260,
-                    overflowY: 'auto',
-                    border: '1px solid var(--border-subtle)',
-                    borderRadius: 12,
-                    background: 'var(--bg-panel)',
-                    boxShadow: 'var(--shadow-lg)',
-                    padding: 10
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 10 }}>
-                    <div>
-                      <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 3 }}>
-                        Insert block
-                      </div>
-                      <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                        Around L{insertTargetIndex + 1}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      className="btn btn-ghost btn-sm"
-                      onClick={() => setOpenInsertMenuId(null)}
-                      title="Close insert menu"
-                      style={{ height: 24, padding: '0 8px', borderRadius: 999 }}
-                    >
-                      Close ×
-                    </button>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 10 }}>
-                    <button
-                      type="button"
-                      className={`btn ${insertPlacement === 'above' ? 'btn-primary' : 'btn-secondary'} btn-sm`}
-                      onClick={() => setInsertPlacement('above')}
-                      style={{ height: 28, padding: '0 8px' }}
-                    >
-                      Above
-                    </button>
-                    <button
-                      type="button"
-                      className={`btn ${insertPlacement === 'below' ? 'btn-primary' : 'btn-secondary'} btn-sm`}
-                      onClick={() => setInsertPlacement('below')}
-                      style={{ height: 28, padding: '0 8px' }}
-                    >
-                      Below
-                    </button>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                    {ELEMENT_TYPES.map(type => (
-                      <button
-                        key={type}
-                        type="button"
-                        className="btn btn-ghost btn-sm"
-                        onClick={() => insertBlockNear(insertTargetIndex, insertPlacement, type)}
-                        title={`${insertPlacement === 'above' ? 'Insert above' : 'Insert below'} L${insertTargetIndex + 1}: ${ELEMENT_LABELS[type]}`}
-                        style={{
-                          minHeight: 30,
-                          height: 'auto',
-                          padding: '6px 8px',
-                          justifyContent: 'flex-start',
-                          whiteSpace: 'normal',
-                          lineHeight: 1.15,
-                          textAlign: 'left'
-                        }}
-                      >
-                        {ELEMENT_LABELS[type]}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
           {/* Blocks */}
           <div style={{ background: 'var(--bg-surface)', borderRadius: 8, padding: '1in 1.5in 1in 1.5in', boxShadow: '0 4px 32px rgba(0,0,0,0.3)', minHeight: '11in' }}>
             {isBlankScreenplay && (
@@ -1255,6 +1096,7 @@ export default function ScreenplayEditor({ onOpenDocuments }) {
               <BlockLine
                 key={block.id}
                 block={block}
+                blockIndex={index}
                 lineNumber={index + 1}
                 focused={focusedId === block.id}
                 selected={selectedBlockIds.includes(block.id)}
@@ -1267,6 +1109,7 @@ export default function ScreenplayEditor({ onOpenDocuments }) {
                   setOpenInsertMenuId(null)
                   setOpenTypeMenuId(current => current === block.id ? null : block.id)
                 }}
+                onChangeBlockType={type => changeBlockType(block.id, type)}
                 typeMenuOpen={openTypeMenuId === block.id}
                 insertMenuOpen={openInsertMenuId === block.id}
                 onToggleInsertMenu={() => {
@@ -1274,6 +1117,9 @@ export default function ScreenplayEditor({ onOpenDocuments }) {
                   setOpenTypeMenuId(null)
                   setOpenInsertMenuId(current => current === block.id ? null : block.id)
                 }}
+                onInsertBlock={(placement, type) => insertBlockNear(index, placement, type)}
+                insertPlacement={insertPlacement}
+                onSetInsertPlacement={setInsertPlacement}
                 onKeyDown={e => handleKeyDown(e, block, index)}
                 onCopy={handleCopy}
                 onCut={e => handleCut(e, block, index)}
@@ -1441,9 +1287,19 @@ export default function ScreenplayEditor({ onOpenDocuments }) {
   )
 }
 
-function BlockLine({ block, lineNumber, focused, selected, inputRef, onFocus, onMouseDown, onChange, onTypeChange, typeMenuOpen, insertMenuOpen, onToggleInsertMenu, onKeyDown, onCopy, onCut, onPaste }) {
+function BlockLine({ block, blockIndex, lineNumber, focused, selected, inputRef, onFocus, onMouseDown, onChange, onTypeChange, onChangeBlockType, typeMenuOpen, insertMenuOpen, onToggleInsertMenu, onInsertBlock, insertPlacement, onSetInsertPlacement, onKeyDown, onCopy, onCut, onPaste }) {
   const controlsVisible = focused || selected || typeMenuOpen || insertMenuOpen
   const localRef = useRef(null)
+  const lineRef = useRef(null)
+  const [trayFlipUp, setTrayFlipUp] = useState(false)
+
+  // Measure viewport room when a tray opens, flip above line if < 300px below
+  useEffect(() => {
+    if (!typeMenuOpen && !insertMenuOpen) return
+    if (!lineRef.current) return
+    const rect = lineRef.current.getBoundingClientRect()
+    setTrayFlipUp(window.innerHeight - rect.bottom < 300)
+  }, [typeMenuOpen, insertMenuOpen])
 
   useEffect(() => {
     const ta = localRef.current
@@ -1451,6 +1307,10 @@ function BlockLine({ block, lineNumber, focused, selected, inputRef, onFocus, on
     ta.style.height = 'auto'
     ta.style.height = `${ta.scrollHeight}px`
   }, [block.text, block.type])
+
+  const trayPositionStyle = trayFlipUp
+    ? { bottom: '100%', marginBottom: 6 }
+    : { top: '100%', marginTop: 6 }
 
   const styleMap = {
     'scene-heading': { textTransform: 'uppercase', fontWeight: 'bold', marginTop: '2em', color: 'var(--text-primary)' },
@@ -1492,6 +1352,7 @@ function BlockLine({ block, lineNumber, focused, selected, inputRef, onFocus, on
 
   return (
     <div
+      ref={lineRef}
       className="screenplay-line"
       onMouseDown={onMouseDown}
       style={{
@@ -1552,7 +1413,7 @@ function BlockLine({ block, lineNumber, focused, selected, inputRef, onFocus, on
           letterSpacing: '0.04em',
           textAlign: 'center',
           pointerEvents: 'auto',
-          zIndex: typeMenuOpen ? 45 : 20
+          zIndex: 2
         }}
       >
         {chipLabels[block.type] || 'TYPE'}
@@ -1566,7 +1427,7 @@ function BlockLine({ block, lineNumber, focused, selected, inputRef, onFocus, on
           top: 22,
           opacity: controlsVisible ? 1 : 0,
           transition: 'opacity 0.15s',
-          zIndex: insertMenuOpen ? 40 : 10
+          zIndex: 2
         }}
       >
         <button
@@ -1591,6 +1452,116 @@ function BlockLine({ block, lineNumber, focused, selected, inputRef, onFocus, on
           +
         </button>
       </div>
+
+      {/* Type-change tray — absolute, local to this line */}
+      {typeMenuOpen && (
+        <div
+          data-screenplay-floating-panel
+          className="selectable screenplay-tray"
+          style={trayPositionStyle}
+        >
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 10 }}>
+            <div>
+              <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 3 }}>
+                Change type
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                Line L{lineNumber}
+              </div>
+            </div>
+            <button
+              type="button"
+              data-screenplay-floating-panel
+              className="btn btn-ghost btn-sm"
+              onClick={e => { e.stopPropagation(); onTypeChange() }}
+              title="Close type menu"
+              style={{ height: 24, padding: '0 8px', borderRadius: 999 }}
+            >
+              Close ×
+            </button>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+            {ELEMENT_TYPES.map(t => (
+              <button
+                key={t}
+                type="button"
+                data-screenplay-floating-panel
+                className={`btn ${block.type === t ? 'btn-primary' : 'btn-ghost'} btn-sm`}
+                onClick={e => { e.stopPropagation(); onChangeBlockType(t) }}
+                title={`Change L${lineNumber} to ${ELEMENT_LABELS[t]}`}
+                style={{ minHeight: 30, height: 'auto', padding: '6px 8px', justifyContent: 'flex-start', whiteSpace: 'normal', lineHeight: 1.15, textAlign: 'left' }}
+              >
+                {ELEMENT_LABELS[t]}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Insert-block tray — absolute, local to this line */}
+      {insertMenuOpen && (
+        <div
+          data-screenplay-floating-panel
+          className="selectable screenplay-tray"
+          style={trayPositionStyle}
+        >
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 10 }}>
+            <div>
+              <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 3 }}>
+                Insert block
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                Around L{lineNumber}
+              </div>
+            </div>
+            <button
+              type="button"
+              data-screenplay-floating-panel
+              className="btn btn-ghost btn-sm"
+              onClick={e => { e.stopPropagation(); onToggleInsertMenu() }}
+              title="Close insert menu"
+              style={{ height: 24, padding: '0 8px', borderRadius: 999 }}
+            >
+              Close ×
+            </button>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 10 }}>
+            <button
+              type="button"
+              data-screenplay-floating-panel
+              className={`btn ${insertPlacement === 'above' ? 'btn-primary' : 'btn-secondary'} btn-sm`}
+              onClick={e => { e.stopPropagation(); onSetInsertPlacement('above') }}
+              style={{ height: 28, padding: '0 8px' }}
+            >
+              Above
+            </button>
+            <button
+              type="button"
+              data-screenplay-floating-panel
+              className={`btn ${insertPlacement === 'below' ? 'btn-primary' : 'btn-secondary'} btn-sm`}
+              onClick={e => { e.stopPropagation(); onSetInsertPlacement('below') }}
+              style={{ height: 28, padding: '0 8px' }}
+            >
+              Below
+            </button>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+            {ELEMENT_TYPES.map(t => (
+              <button
+                key={t}
+                type="button"
+                data-screenplay-floating-panel
+                className="btn btn-ghost btn-sm"
+                onClick={e => { e.stopPropagation(); onInsertBlock(insertPlacement, t) }}
+                title={`${insertPlacement === 'above' ? 'Insert above' : 'Insert below'} L${lineNumber}: ${ELEMENT_LABELS[t]}`}
+                style={{ minHeight: 30, height: 'auto', padding: '6px 8px', justifyContent: 'flex-start', whiteSpace: 'normal', lineHeight: 1.15, textAlign: 'left' }}
+              >
+                {ELEMENT_LABELS[t]}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <textarea
         ref={el => {

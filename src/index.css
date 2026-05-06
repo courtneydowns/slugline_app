@@ -243,6 +243,26 @@ button,
 .screenplay-line:focus-within .element-badge,
 .screenplay-line:hover .element-badge { opacity: 1; }
 
+/* Phase 4: allow absolute trays to overflow the line box */
+.screenplay-line {
+  overflow: visible;
+}
+
+/* Per-line tray panel (type-change & insert-block) */
+.screenplay-tray {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  max-height: 280px;
+  overflow-y: auto;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  padding: 10px;
+}
+
 /* ─── UI Components ─────────────────────────────────────────────────────────── */
 .btn {
   display: inline-flex;
