@@ -114,6 +114,10 @@ export default function ScreenplayEditor({ onOpenDocuments }) {
     find, setFind, openFind, closeFind,
     annotations, setAnnotations, annotationJumpAnchor, setAnnotationJumpAnchor, toggleAnnotationPanel,
     activeRevision,
+    openChat,
+    characters,
+    worldBuilding,
+    beats,
   } = useStore()
   const [blocks, setBlocks] = useState([{ id: Date.now(), type: 'action', text: '' }])
   const [focusedId, setFocusedId] = useState(null)
@@ -1475,6 +1479,26 @@ export default function ScreenplayEditor({ onOpenDocuments }) {
             ▤ Documents
           </button>
         )}
+        <button
+          className="btn btn-ghost btn-sm no-drag"
+          type="button"
+          onClick={() => {
+            const charNames = characters.map(c => c.name).filter(Boolean).join(', ')
+            const worldEntries = worldBuilding.map(w => w.title || w.category).filter(Boolean).join(', ')
+            const beatSummary = beats.map(b => b.title || b.description).filter(Boolean).join('; ')
+            const scriptText = blocks.map(b => b.text).join('\n')
+            const parts = ["I'm stuck on my screenplay and need help getting unstuck."]
+            if (charNames) parts.push('Characters: ' + charNames)
+            if (worldEntries) parts.push('World/Setting: ' + worldEntries)
+            if (beatSummary) parts.push('Beat sheet: ' + beatSummary)
+            if (scriptText) parts.push('Current script excerpt:\n' + scriptText.slice(-1500))
+            openChat(parts.join('\n\n'))
+          }}
+          title="Get unstuck with Claude"
+          style={{ height: 30, padding: '0 9px', whiteSpace: 'nowrap' }}
+        >
+          ✦ I'm Stuck
+        </button>
         {creatingScreenplay && (
           <>
             <input
@@ -1598,6 +1622,15 @@ export default function ScreenplayEditor({ onOpenDocuments }) {
             style={{ width: '100%', justifyContent: 'flex-start', padding: '7px 14px', borderRadius: 0, border: 'none', fontSize: 12 }}
             onClick={() => { setBlockContextMenu(null); toggleAnnotationPanel() }}>
             ≡ View All Comments
+          </button>
+          <button className="btn btn-ghost btn-sm"
+            style={{ width: '100%', justifyContent: 'flex-start', padding: '7px 14px', borderRadius: 0, border: 'none', fontSize: 12 }}
+            onClick={() => {
+              const anchor = blockContextMenu.block?.text || ''
+              setBlockContextMenu(null)
+              openChat('Ask Claude about this passage:\n\n"' + anchor.slice(0, 400) + '"')
+            }}>
+            ✦ Ask Claude
           </button>
         </div>
       )}

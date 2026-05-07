@@ -447,7 +447,20 @@ async function handleSummarizeSession(event, { projectId, chatSessionId }) {
   }
 }
 
+async function handleFormatScriptNotes(event, { messages }) {
+  const client = getClient()
+  const response = await client.messages.create({
+    model: CLAUDE_MODELS.sonnet,
+    max_tokens: 2000,
+    system: `You are a professional script editor. Given a conversation about a screenplay, reformat the discussion into concise, actionable script notes with exactly five sections using these exact headers:\n\n## What's Working\n## What's Missing\n## Where To Go Next\n## Series Implications\n## Open Questions\n\nBe specific and brief in each section. Draw only from the conversation provided.`,
+    messages,
+  });
+  return response.content[0].text;
+}
+
+
 module.exports = {
+  handleFormatScriptNotes,
   handleValidateApiKey, handleChat, handleCancelChat, handleSummarizeSession, handleInlineSuggestion, handleFullRewrite,
   handleToneAdjust, handleSceneAnalysis, handleDialogueCoach, handleDevelopmentQuestion,
   handleGenerateStoryBible, handleLoglineAssist, handleResearchIngest, handleAutoTag,

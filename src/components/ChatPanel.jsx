@@ -12,7 +12,9 @@ export default function ChatPanel({ expanded = false, onToggleExpand, onPopOut }
     currentChatSessionId,
     setCurrentChatSessionId,
     addNotification,
-    setDocuments
+    setDocuments,
+    stuckPrompt,
+    clearStuckPrompt,
   } = useStore()
 
   const [input, setInput]       = useState('')
@@ -27,6 +29,7 @@ export default function ChatPanel({ expanded = false, onToggleExpand, onPopOut }
   const renameRef  = useRef()
   const activeStreamRef = useRef(null)
   const currentRequestIdRef = useRef(null)
+  const pendingSendRef = useRef(false)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -70,18 +73,20 @@ export default function ChatPanel({ expanded = false, onToggleExpand, onPopOut }
   // ── Session actions ───────────────────────────────────────────────────────
 
   async function handleNewChat() {
-    if (!currentProject) return
+    if (!currentProject) return null
     const session = await window.api.createChatSession(currentProject.id)
     const updated = await window.api.getChatSessions(currentProject.id)
     setChatSessions(updated)
     setCurrentChatSessionId(session.id)
     // history will be empty for new session — set it immediately
     setChatHistory([])
+    return session.id
   }
 
   function handleSelectSession(id) {
     if (id === currentChatSessionId) return
     setStreaming('')
+    setInput('')
     setCurrentChatSessionId(id)
     // history reload handled by effect above
   }
@@ -232,6 +237,60 @@ export default function ChatPanel({ expanded = false, onToggleExpand, onPopOut }
       }
     } catch (err) {
       addNotification('Could not save chat: ' + err.message, 'error')
+    }
+  }
+
+  // ── Auto-fire stuckPrompt ────────────────────────────────────────────────
+  const pendingStuckRef = useRef(null)
+  const stuckFiringRef = useRef(false)
+
+  useEffect(() => {
+    if (!stuckPrompt || loading || stuckFiringRef.current) return
+    stuckFiringRef.current = true
+    const prompt = stuckPrompt
+    clearStuckPrompt()
+    handleNewChat().then(newSessionId => {
+      stuckFiringRef.current = false
+      if (!newSessionId) return
+      pendingStuckRef.current = prompt
+      setTimeout(() => {
+        if (!pendingStuckRef.current) return
+        const p = pendingStuckRef.current
+        pendingStuckRef.current = null
+        pendingSendRef.current = true
+        setInput(p)
+      }, 80)
+    })
+  }, [stuckPrompt]) // eslint-disable-line
+
+  useEffect(() => {
+    if (!pendingSendRef.current || !input.trim()) return
+    pendingSendRef.current = false
+    handleSend({ preventDefault: () => {} })
+  }, [input]) // eslint-disable-line
+
+  // ── Format as Script Notes ───────────────────────────────────────────────
+  async function handleFormatScriptNotes() {
+    if (chatHistory.length < 4) return
+    const rawMessages = chatHistory.map(m => ({ role: m.role, content: m.content }))
+    // API requires conversation to end with a user message
+    const messages = [...rawMessages]
+    while (messages.length && messages[messages.length - 1].role !== 'user') messages.pop()
+    if (!messages.length) return
+    try {
+      const result = await window.api.formatScriptNotes(messages)
+      const date = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+      await window.api.createDocument({
+        project_id: currentProject.id,
+        title: 'Script Notes — ' + date,
+        content: result,
+        document_type: 'project-document'
+      })
+      const docs = await window.api.getAllDocuments(currentProject.id)
+      setDocuments(docs)
+      addNotification('Script notes saved to Documents.', 'success')
+    } catch (err) {
+      addNotification('Could not format script notes: ' + err.message, 'error')
     }
   }
 
@@ -572,6 +631,17 @@ export default function ChatPanel({ expanded = false, onToggleExpand, onPopOut }
 
       {/* ── Input ── */}
       <div style={{ padding: 12, borderTop: '1px solid var(--border-subtle)' }}>
+        {chatHistory.length >= 4 && (
+          <button
+            className="btn btn-ghost btn-sm"
+            type="button"
+            onClick={handleFormatScriptNotes}
+            style={{ width: '100%', marginBottom: 8, fontSize: 12, justifyContent: 'center' }}
+            title="Reformat this conversation into structured script notes and save to Documents"
+          >
+            ✦ Format as Script Notes
+          </button>
+        )}
         <form onSubmit={handleSend} style={{ display: 'flex', gap: 8 }}>
           <textarea
             ref={inputRef}

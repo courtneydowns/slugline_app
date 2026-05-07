@@ -294,6 +294,12 @@ const useStore = create((set, get) => ({
   openFind:  ()      => set(s => ({ find: { ...s.find, open: true } })),
   closeFind: ()      => set(s => ({ find: { ...s.find, open: false, query: '', replaceQuery: '' } })),
 
+  // Stuck / openChat
+  stuckPrompt: null,
+  setStuckPrompt: (prompt) => set({ stuckPrompt: prompt }),
+  clearStuckPrompt: () => set({ stuckPrompt: null }),
+  openChat: (prompt) => set({ stuckPrompt: prompt, showChat: true }),
+
   // Annotations
   annotations: [],
   annotationPanelOpen: false,

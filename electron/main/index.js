@@ -233,7 +233,8 @@ ipcMain.handle('claude:auto-tag', claude.handleAutoTag)
 ipcMain.handle('claude:writing-prompt', claude.handleWritingPrompt)
 ipcMain.handle('claude:tv-vs-feature', claude.handleTvVsFeature)
 ipcMain.handle('claude:beat-sheet-analysis', claude.handleBeatSheetAnalysis)
-ipcMain.handle('claude:estimate-tokens', claude.handleEstimateTokens)
+ipcMain.handle('claude:format-script-notes', claude.handleFormatScriptNotes);
+  ipcMain.handle('claude:estimate-tokens', claude.handleEstimateTokens)
 
 // Revisions
 ipcMain.handle('revisions:get-all', (e, documentId) => db.getRevisions(documentId))

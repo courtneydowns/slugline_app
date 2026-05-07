@@ -114,6 +114,9 @@ contextBridge.exposeInMainWorld('api', {
   deleteAnnotation: (id) => ipcRenderer.invoke('annotations:delete', id),
   resolveAnnotation: (id) => ipcRenderer.invoke('annotations:resolve', id),
 
+  // Format script notes
+  formatScriptNotes: (messages) => ipcRenderer.invoke('claude:format-script-notes', { messages }),
+
   // Chat pop-out
   openChatPopout: (data) => ipcRenderer.invoke('chat:open-popout', data),
 
