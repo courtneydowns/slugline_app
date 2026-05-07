@@ -149,6 +149,29 @@ CREATE TABLE IF NOT EXISTS token_usage (
   output_tokens INTEGER DEFAULT 0,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS annotations (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  document_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+  anchor_text TEXT NOT NULL,
+  block_type TEXT,
+  comment TEXT NOT NULL,
+  resolved INTEGER DEFAULT 0,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+
+CREATE TABLE IF NOT EXISTS revisions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  document_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+  draft_color TEXT NOT NULL DEFAULT 'white',
+  draft_number INTEGER NOT NULL DEFAULT 1,
+  locked_at DATETIME,
+  scene_number_map TEXT DEFAULT '{}',
+  locked_content TEXT DEFAULT '',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
 `;
 
 module.exports = { SCHEMA };

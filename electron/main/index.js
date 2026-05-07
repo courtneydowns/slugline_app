@@ -189,6 +189,15 @@ ipcMain.handle('chat:clear', (e, { projectId, context, sessionId }) => db.clearC
 registerChatSessionHandlers(ipcMain)
 
 // Brainstorm
+ipcMain.handle('scenes:get-for-document', (e, documentId) => db.getScenesForDocument(documentId))
+ipcMain.handle('scenes:sync', (e, { documentId, projectId, scenes }) => db.syncScenes(documentId, projectId, scenes))
+
+// Annotations
+ipcMain.handle('annotations:get-all', (e, documentId) => db.getAnnotations(documentId))
+ipcMain.handle('annotations:upsert', (e, data) => db.upsertAnnotation(data))
+ipcMain.handle('annotations:delete', (e, id) => db.deleteAnnotation(id))
+ipcMain.handle('annotations:resolve', (e, id) => db.resolveAnnotation(id))
+
 ipcMain.handle('brainstorm:get-all', (e, projectId) => db.getBrainstormEntries(projectId))
 ipcMain.handle('brainstorm:add', (e, data) => db.addBrainstormEntry(data))
 ipcMain.handle('brainstorm:update', (e, { id, data }) => db.updateBrainstormEntry(id, data))
@@ -225,6 +234,20 @@ ipcMain.handle('claude:writing-prompt', claude.handleWritingPrompt)
 ipcMain.handle('claude:tv-vs-feature', claude.handleTvVsFeature)
 ipcMain.handle('claude:beat-sheet-analysis', claude.handleBeatSheetAnalysis)
 ipcMain.handle('claude:estimate-tokens', claude.handleEstimateTokens)
+
+// Revisions
+ipcMain.handle('revisions:get-all', (e, documentId) => db.getRevisions(documentId))
+ipcMain.handle('revisions:create', (e, { documentId, draftColor }) => db.createRevision(documentId, draftColor))
+ipcMain.handle('revisions:lock', async (e, { revisionId, sceneNumberMap, lockedContent, projectId }) => {
+  try {
+    const revision = db.lockRevision(revisionId, sceneNumberMap, lockedContent)
+    db.createSnapshot(projectId, `Locked ${revision.draft_color} draft #${revision.draft_number}`, 'manual')
+    return { success: true, revision }
+  } catch (err) {
+    console.error('[revisions:lock] ERROR:', err)
+    return { success: false, error: err.message }
+  }
+})
 
 // Backup
 ipcMain.handle('backup:panic', backup.handlePanicExport)

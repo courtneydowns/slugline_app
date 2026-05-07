@@ -68,7 +68,7 @@ ${paragraphs}  </Content>
 
 // ─── PDF export ───────────────────────────────────────────────────────────────
 
-async function toPdf(project, document) {
+async function toPdf(project, document, revisionData) {
   const pdfDoc = await PDFDocument.create()
   const font = await pdfDoc.embedFont(StandardFonts.Courier)
   const boldFont = await pdfDoc.embedFont(StandardFonts.CourierBold)
@@ -111,7 +111,28 @@ async function toPdf(project, document) {
   page = pdfDoc.addPage([pageWidth, pageHeight])
   y = pageHeight - marginTop
 
-  let inSpeech = false   // true after a Character cue; cleared by blank line or structural element
+  let inSpeech = false
+
+  const revSceneNums = revisionData ? revisionData.sceneNumberMap : {}
+  const revChangedScenes = new Set()
+  if (revisionData && revisionData.lockedContent) {
+    const parseScenes = (text) => {
+      const map = {}; const ls = (text || '').split('\n')
+      let cur = null, buf = []
+      for (const l of ls) {
+        const t = l.trim()
+        if (/^(INT\.|EXT\.|INT\/EXT\.)/i.test(t)) {
+          if (cur !== null) map[cur] = buf.join('\n')
+          cur = t.toUpperCase(); buf = []
+        } else if (cur !== null) buf.push(l)
+      }
+      if (cur !== null) map[cur] = buf.join('\n')
+      return map
+    }
+    const locked = parseScenes(revisionData.lockedContent)
+    const current = parseScenes(document.content || '')
+    for (const [h, c] of Object.entries(current)) { if (locked[h] !== c) revChangedScenes.add(h) }
+  }
 
   for (const line of lines) {
     if (y < marginBottom) {
@@ -184,7 +205,7 @@ function wrapText(text, font, size, maxWidth) {
 
 // ─── DOCX export ──────────────────────────────────────────────────────────────
 
-async function toDocx(project, document) {
+async function toDocx(project, document, revisionData) {
   const { Document, Packer, Paragraph, TextRun, AlignmentType } = require('docx')
 
   const content = document.content || ''
@@ -248,12 +269,26 @@ async function toDocx(project, document) {
 
 // ─── Main export handler ──────────────────────────────────────────────────────
 
-async function handleExport(event, { projectId, documentId, format, destination }) {
+async function handleExport(event, { projectId, documentId, format, destination, revisionId, includeRevisionMarks }) {
   try {
     const project = db.getProject(projectId)
     const document = db.getDocument(documentId)
 
     let content, ext, encoding = 'utf8'
+
+    let revisionData = null
+    if (includeRevisionMarks && revisionId) {
+      try {
+        const rev = db.getRevision(revisionId)
+        if (rev && rev.locked_at) {
+          revisionData = {
+            sceneNumberMap: JSON.parse(rev.scene_number_map || '{}'),
+            lockedContent: rev.locked_content || '',
+            draftColor: rev.draft_color,
+          }
+        }
+      } catch (_) {}
+    }
 
     switch (format) {
       case 'fountain':
@@ -269,12 +304,12 @@ async function handleExport(event, { projectId, documentId, format, destination 
         ext = 'fdx'
         break
       case 'pdf':
-        content = await toPdf(project, document)
+        content = await toPdf(project, document, revisionData)
         ext = 'pdf'
         encoding = null
         break
       case 'docx':
-        content = await toDocx(project, document)
+        content = await toDocx(project, document, revisionData)
         ext = 'docx'
         encoding = null
         break

@@ -15,24 +15,31 @@ import DialogueCoach from './DialogueCoach'
 import ExportModal from './ExportModal'
 import SettingsModal from './SettingsModal'
 import SnapshotModal from './SnapshotModal'
+import RevisionModal from './RevisionModal'
 import CameraLibrary from './CameraLibrary'
 import ReadThroughMode from './ReadThroughMode'
 import TokenPreview from './TokenPreview'
 import DocumentsWorkspace from './DocumentsWorkspace'
+import SceneCards from './SceneCards'
+import AnnotationPanel from './AnnotationPanel'
 
 export default function AppShell() {
   const {
     activeWorkspace, setActiveWorkspace,
     showChat, showBible, layoutMode, setLayoutMode,
     showAnalysis, showDialogueCoach, showExport, showSettings,
-    showSnapshots, navRailOpen,
+    showSnapshots, showRevision, setShowRevision, navRailOpen,
+    typewriterMode, setTypewriterMode,
     toggleChat, toggleBible,
     setShowAnalysis, setShowDialogueCoach, setShowExport,
     setShowSettings, setShowSnapshots,
-    currentProject, addNotification,
+    currentProject, currentDocument, addNotification,
+    annotations, annotationPanelOpen, toggleAnnotationPanel,
+    loadAnnotations, setAnnotationJumpAnchor,
   } = useStore()
 
   const [chatExpanded, setChatExpanded] = useState(false)
+  const [focusBarVisible, setFocusBarVisible] = useState(false)
 
   useEffect(() => {
     const cleanups = [
@@ -51,6 +58,17 @@ export default function AppShell() {
     ]
     return () => cleanups.forEach(c => c?.())
   }, [layoutMode])
+
+  useEffect(() => {
+    if (layoutMode !== 'focus') return
+    const handler = (e) => { if (e.key === 'Escape') setTypewriterMode(false) }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [layoutMode])
+
+  React.useEffect(() => {
+    if (currentDocument?.id) loadAnnotations(currentDocument.id)
+  }, [currentDocument?.id])
 
   async function handlePanicExport() {
     if (!currentProject) return
@@ -91,9 +109,10 @@ export default function AppShell() {
     switch (activeWorkspace) {
       case 'dashboard':
         return <Dashboard />
-      case 'editor':
+      case 'editor': {
+        const openCount = (annotations || []).filter(a => !a.resolved).length
         return (
-          <div className="workspace-editor-layout">
+          <div className="workspace-editor-layout" style={{ position: 'relative' }}>
             <div className="workspace-editor-main">
               <ScreenplayEditor onOpenDocuments={() => setActiveWorkspace('documents')} />
             </div>
@@ -102,8 +121,32 @@ export default function AppShell() {
                 <StoryBible />
               </div>
             )}
+            {annotationPanelOpen && layoutMode !== 'focus' && (
+              <AnnotationPanel onJumpToBlock={(text) => setAnnotationJumpAnchor(text)} />
+            )}
+            {layoutMode !== 'focus' && (
+              <button
+                onClick={toggleAnnotationPanel}
+                title="Toggle Comments Panel"
+                style={{
+                  position: 'absolute', bottom: 12,
+                  right: annotationPanelOpen ? 292 : 12,
+                  zIndex: 10,
+                  background: annotationPanelOpen ? 'var(--amber)' : 'var(--bg-raised)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 999,
+                  color: annotationPanelOpen ? '#000' : 'var(--text-muted)',
+                  fontSize: 11, padding: '5px 12px',
+                  cursor: 'pointer', fontFamily: 'var(--font-ui)',
+                  transition: 'right 0.2s',
+                }}
+              >
+                {'◉'}{openCount > 0 ? ' ' + openCount : ''} Comments
+              </button>
+            )}
           </div>
         )
+      }
       case 'documents':
         return (
           <div className="workspace-fullpage">
@@ -126,6 +169,12 @@ export default function AppShell() {
         return (
           <div className="workspace-fullpage">
             <BrainstormCanvas embedded onClose={() => setActiveWorkspace('dashboard')} />
+          </div>
+        )
+      case 'cards':
+        return (
+          <div className="workspace-fullpage">
+            <SceneCards embedded onClose={() => setActiveWorkspace('dashboard')} />
           </div>
         )
       case 'cameralibrary':
@@ -158,6 +207,32 @@ export default function AppShell() {
 
   return (
     <div className="app-shell-v2">
+      {isFocus && (
+        <div
+          style={{ position: 'fixed', top: 0, left: 0, right: 0, height: 40, zIndex: 9999, pointerEvents: 'auto' }}
+          onMouseEnter={() => setFocusBarVisible(true)}
+          onMouseLeave={() => setFocusBarVisible(false)}
+        >
+          <div style={{
+            position: 'absolute', top: 0, left: 0, right: 0, height: 40,
+            background: 'var(--bg-base)',
+            borderBottom: '1px solid var(--border)',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '0 16px',
+            opacity: focusBarVisible ? 1 : 0,
+            pointerEvents: focusBarVisible ? 'auto' : 'none',
+            transition: 'opacity 0.15s ease',
+          }}>
+            <span style={{ fontFamily: 'var(--font-display)', fontSize: 14, color: 'var(--amber)', letterSpacing: '-0.01em' }}>Slugline</span>
+            <button
+              onClick={() => setTypewriterMode(false)}
+              style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text-muted)', fontSize: 12, padding: '3px 14px', cursor: 'pointer' }}
+            >
+              Exit Distraction-Free &nbsp;<kbd style={{ opacity: 0.55, fontFamily: 'inherit', fontSize: 11 }}>Esc</kbd>
+            </button>
+          </div>
+        </div>
+      )}
       {!isFocus && (
         <div className="topbar-slot">
           <TopBar onPanic={handlePanicExport} />
@@ -182,14 +257,17 @@ export default function AppShell() {
           </div>
         )}
       </div>
-      <div className="statusbar-slot">
-        <StatusBar onPanic={handlePanicExport} />
-      </div>
+      {!isFocus && (
+        <div className="statusbar-slot">
+          <StatusBar onPanic={handlePanicExport} />
+        </div>
+      )}
       {showAnalysis && <SceneAnalysis onClose={() => setShowAnalysis(false)} />}
       {showDialogueCoach && <DialogueCoach onClose={() => setShowDialogueCoach(false)} />}
       {showExport && <ExportModal onClose={() => setShowExport(false)} />}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
       {showSnapshots && <SnapshotModal onClose={() => setShowSnapshots(false)} />}
+      {showRevision && <RevisionModal onClose={() => setShowRevision(false)} />}
       <TokenPreview />
     </div>
   )

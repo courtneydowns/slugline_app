@@ -99,6 +99,21 @@ contextBridge.exposeInMainWorld('api', {
   openFolderDialog: () => ipcRenderer.invoke('dialog:open-folder'),
   openPath: (p) => ipcRenderer.invoke('shell:open-path', p),
 
+  // Scenes
+  getScenesForDocument: (documentId) => ipcRenderer.invoke('scenes:get-for-document', documentId),
+  syncScenes: (documentId, projectId, scenes) => ipcRenderer.invoke('scenes:sync', { documentId, projectId, scenes }),
+
+  // Revisions
+  getRevisions: (documentId) => ipcRenderer.invoke('revisions:get-all', documentId),
+  createRevision: (documentId, draftColor) => ipcRenderer.invoke('revisions:create', { documentId, draftColor }),
+  lockRevision: (revisionId, sceneNumberMap, lockedContent, projectId) => ipcRenderer.invoke('revisions:lock', { revisionId, sceneNumberMap, lockedContent, projectId }),
+
+  // Annotations
+  getAnnotations: (documentId) => ipcRenderer.invoke('annotations:get-all', documentId),
+  upsertAnnotation: (data) => ipcRenderer.invoke('annotations:upsert', data),
+  deleteAnnotation: (id) => ipcRenderer.invoke('annotations:delete', id),
+  resolveAnnotation: (id) => ipcRenderer.invoke('annotations:resolve', id),
+
   // Chat pop-out
   openChatPopout: (data) => ipcRenderer.invoke('chat:open-popout', data),
 

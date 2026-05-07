@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react'
 import useStore, { _setLastActiveScreenplayDocId } from '../store'
+import FindBar from './FindBar'
 
 const ELEMENT_TYPES = ['scene-heading', 'action', 'character', 'dialogue', 'parenthetical', 'transition', 'shot', 'note']
 const ELEMENT_LABELS = {
@@ -11,6 +12,12 @@ const ELEMENT_LABELS = {
   'transition': 'Transition',
   'shot': 'Shot / Camera Angle',
   'note': 'Note'
+}
+
+const REVISION_COLORS = {
+  white: '#c0c0c0', blue: '#7bb3f5', pink: '#f57bb3', yellow: '#e8d060',
+  green: '#60d880', goldenrod: '#d4a030', buff: '#c8a870', salmon: '#e88060',
+  cherry: '#e06060', tan: '#b09060', 'double-blue': '#4a8fd4', 'double-pink': '#c44a8f',
 }
 
 // Smart next element type after pressing Enter
@@ -85,6 +92,10 @@ function fountainToBlocks(text) {
   return blocks.length > 0 ? blocks : [{ id: Date.now(), type: 'action', text: '' }]
 }
 
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
 export default function ScreenplayEditor({ onOpenDocuments }) {
   const {
     currentDocument,
@@ -97,8 +108,12 @@ export default function ScreenplayEditor({ onOpenDocuments }) {
     setFocusedScreenplayBlockId,
     setFocusedScreenplayBlockIndex,
     layoutMode,
+    typewriterMode,
     suggestions,
-    setSuggestions
+    setSuggestions,
+    find, setFind, openFind, closeFind,
+    annotations, setAnnotations, annotationJumpAnchor, setAnnotationJumpAnchor, toggleAnnotationPanel,
+    activeRevision,
   } = useStore()
   const [blocks, setBlocks] = useState([{ id: Date.now(), type: 'action', text: '' }])
   const [focusedId, setFocusedId] = useState(null)
@@ -106,6 +121,38 @@ export default function ScreenplayEditor({ onOpenDocuments }) {
   const [openInsertMenuId, setOpenInsertMenuId] = useState(null)
   const [openTypeMenuId, setOpenTypeMenuId] = useState(null)
   const [insertPlacement, setInsertPlacement] = useState('below')
+  const [blockContextMenu, setBlockContextMenu] = useState(null)
+  const [addCommentForm, setAddCommentForm] = useState(null)
+
+  const sceneNumberMap = React.useMemo(() => {
+    if (!activeRevision || !activeRevision.locked_at) return {}
+    try { return JSON.parse(activeRevision.scene_number_map || '{}') } catch { return {} }
+  }, [activeRevision])
+
+  const changedSceneSet = React.useMemo(() => {
+    if (!activeRevision || !activeRevision.locked_at || !activeRevision.locked_content) return new Set()
+    const parseScenes = (text) => {
+      const map = {}
+      const lines = (text || '').split('\n')
+      let current = null, buf = []
+      for (const line of lines) {
+        const t = line.trim()
+        if (/^(INT\.|EXT\.|INT\/EXT\.)/i.test(t)) {
+          if (current !== null) map[current] = buf.join('\n')
+          current = t.toUpperCase(); buf = []
+        } else if (current !== null) { buf.push(line) }
+      }
+      if (current !== null) map[current] = buf.join('\n')
+      return map
+    }
+    const locked = parseScenes(activeRevision.locked_content)
+    const current = parseScenes(blocksToFountain(blocks))
+    const changed = new Set()
+    for (const [h, c] of Object.entries(current)) {
+      if (locked[h] !== c) changed.add(h)
+    }
+    return changed
+  }, [activeRevision, blocks])
 
   function setFocusedBlock(blockId) {
     setFocusedId(blockId)
@@ -129,6 +176,34 @@ export default function ScreenplayEditor({ onOpenDocuments }) {
     const index = blocks.findIndex(block => block.id === focusedId)
     setFocusedScreenplayBlockIndex?.(index >= 0 ? index : null)
   }, [focusedId, blocks, setFocusedScreenplayBlockIndex])
+  useEffect(() => {
+    if (!typewriterMode || !focusedId) return
+    const el = refs.current[focusedId]
+    const container = containerRef.current
+    if (!el || !container) return
+    const elRect = el.getBoundingClientRect()
+    const containerRect = container.getBoundingClientRect()
+    const relativeTop = elRect.top - containerRect.top + container.scrollTop
+    container.scrollTo({ top: relativeTop - container.clientHeight / 2 + el.clientHeight / 2, behavior: 'smooth' })
+  }, [focusedId, typewriterMode])
+
+  React.useEffect(() => {
+    if (!blockContextMenu) return
+    function handleClick() { setBlockContextMenu(null) }
+    window.addEventListener('click', handleClick)
+    return () => window.removeEventListener('click', handleClick)
+  }, [blockContextMenu])
+
+  React.useEffect(() => {
+    if (!annotationJumpAnchor) return
+    const match = blocks.find(b => b.text.trim() === annotationJumpAnchor.trim())
+    if (match) {
+      const el = refs.current[match.id]
+      if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); setFocusedBlock(match.id) }
+    }
+    setAnnotationJumpAnchor(null)
+  }, [annotationJumpAnchor])
+
   const [sceneNavigatorCollapsed, setSceneNavigatorCollapsed] = useState(true)
   const [savedAt, setSavedAt] = useState(null)
   const [writingPrompt, setWritingPrompt] = useState('')
@@ -154,6 +229,7 @@ export default function ScreenplayEditor({ onOpenDocuments }) {
   const typingHistoryTimerRef = useRef(null)  // debounce handle for typing history
   const preTypingSnapshotRef  = useRef(null)  // blocks snapshot before current typing burst
   const [historyVersion, setHistoryVersion] = useState(0)
+  const [findMatchIdx, setFindMatchIdx] = useState(0)
 
   function isSavedChatExport(doc) {
     const title = doc?.title || ''
@@ -179,6 +255,27 @@ export default function ScreenplayEditor({ onOpenDocuments }) {
         return aTime - bTime
       })
   }, [documents])
+
+  const findMatches = useMemo(() => {
+    if (!find.open || !find.query.trim()) return []
+    try {
+      const flags = find.matchCase ? '' : 'i'
+      const escaped = escapeRegex(find.query)
+      const pattern = find.wholeWord ? `\\b${escaped}\\b` : escaped
+      const re = new RegExp(pattern, flags)
+      return blocks
+        .map((b, idx) => ({ blockId: b.id, blockIndex: idx, text: b.text }))
+        .filter(m => re.test(m.text))
+    } catch { return [] }
+  }, [find.open, find.query, find.matchCase, find.wholeWord, blocks])
+
+  // Reset active match index and scroll to first hit when query/options change
+  useEffect(() => {
+    setFindMatchIdx(0)
+    if (findMatches.length > 0) {
+      refs.current[findMatches[0].blockId]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [find.query, find.matchCase, find.wholeWord]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function saveCurrentScreenplayNow() {
     const doc = currentDocument   // capture at call time
@@ -364,6 +461,18 @@ export default function ScreenplayEditor({ onOpenDocuments }) {
     })
     return cleanup
   }, [focusedId])
+
+  // Cmd+F to open find bar (scoped to ScreenplayEditor lifecycle)
+  useEffect(() => {
+    function handler(e) {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+        e.preventDefault()
+        useStore.getState().openFind()
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
 
   // Idle writing prompt (30s idle)
   const triggerWritingPrompt = useCallback(async () => {
@@ -776,6 +885,54 @@ export default function ScreenplayEditor({ onOpenDocuments }) {
     return true
   }
 
+  function buildFindPattern(global = false) {
+    const flags = (find.matchCase ? '' : 'i') + (global ? 'g' : '')
+    const escaped = escapeRegex(find.query)
+    const pattern = find.wholeWord ? `\\b${escaped}\\b` : escaped
+    return new RegExp(pattern, flags)
+  }
+
+  function handleFindNext() {
+    if (findMatches.length === 0) return
+    const next = (findMatchIdx + 1) % findMatches.length
+    setFindMatchIdx(next)
+    const target = findMatches[next]
+    if (target) refs.current[target.blockId]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
+
+  function handleFindPrev() {
+    if (findMatches.length === 0) return
+    const prev = (findMatchIdx - 1 + findMatches.length) % findMatches.length
+    setFindMatchIdx(prev)
+    const target = findMatches[prev]
+    if (target) refs.current[target.blockId]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
+
+  function handleFindReplace() {
+    if (findMatches.length === 0 || !find.query) return
+    const match = findMatches[findMatchIdx]
+    if (!match) return
+    const re = buildFindPattern(false)
+    const newText = match.text.replace(re, find.replaceQuery)
+    if (newText === match.text) return
+    const nextBlocks = blocks.map(b => b.id === match.blockId ? { ...b, text: newText } : b)
+    commitBlocks(nextBlocks, { focusId: match.blockId, focusPosition: 'end' })
+  }
+
+  function handleFindReplaceAll() {
+    if (findMatches.length === 0 || !find.query) return
+    const re = buildFindPattern(true)
+    const matchSet = new Set(findMatches.map(m => m.blockId))
+    const count = findMatches.length
+    const nextBlocks = blocks.map(b => {
+      if (!matchSet.has(b.id)) return b
+      return { ...b, text: b.text.replace(re, find.replaceQuery) }
+    })
+    commitBlocks(nextBlocks, {})
+    addNotification?.(`Replaced ${count} occurrence${count !== 1 ? 's' : ''}.`, 'success')
+    setFindMatchIdx(0)
+  }
+
   function handleKeyDown(e, block, index) {
     const el = refs.current[block.id]
 
@@ -1050,6 +1207,7 @@ export default function ScreenplayEditor({ onOpenDocuments }) {
       if (e.key === 'Escape') {
         setOpenInsertMenuId(null)
         setOpenTypeMenuId(null)
+        useStore.getState().closeFind()
       }
     }
 
@@ -1062,10 +1220,35 @@ export default function ScreenplayEditor({ onOpenDocuments }) {
     }
   }, [openInsertMenuId, openTypeMenuId])
 
+  const annotatedTextSet = React.useMemo(
+    () => new Set((annotations || []).filter(a => !a.resolved).map(a => a.anchor_text && a.anchor_text.trim()).filter(Boolean)),
+    [annotations]
+  )
+
+  function handleBlockContextMenu(e, block) {
+    e.preventDefault()
+    setBlockContextMenu({ x: e.clientX, y: e.clientY, block })
+  }
+
+  async function handleSaveComment(block, text) {
+    if (!text.trim() || !currentDocument) return
+    const saved = await window.api.upsertAnnotation({
+      document_id: currentDocument.id,
+      anchor_text: block.text.trim(),
+      block_type: block.type,
+      comment: text.trim()
+    })
+    setAnnotations([...(annotations || []), saved])
+    setAddCommentForm(null)
+    addNotification('Comment added', 'success')
+  }
+
   const focusedBlock = blocks.find(b => b.id === focusedId)
   const canUndo = undoStackRef.current.length > 0
   const canRedo = redoStackRef.current.length > 0
   void historyVersion
+  const findMatchSet = new Set(findMatches.map(m => m.blockId))
+  const findActiveBlockId = findMatches[findMatchIdx]?.blockId ?? null
 
   return (
     <div style={{ display: 'flex', height: '100%', overflow: 'hidden', position: 'relative' }}>
@@ -1192,6 +1375,8 @@ export default function ScreenplayEditor({ onOpenDocuments }) {
                 lineNumber={index + 1}
                 focused={focusedId === block.id}
                 selected={selectedBlockIds.includes(block.id)}
+                findMatch={!selectedBlockIds.includes(block.id) && findMatchSet.has(block.id)}
+                findMatchActive={!selectedBlockIds.includes(block.id) && block.id === findActiveBlockId}
                 inputRef={el => refs.current[block.id] = el}
                 onFocus={() => setFocusedBlock(block.id)}
                 onMouseDown={e => handleBlockSelect(e, block)}
@@ -1217,6 +1402,11 @@ export default function ScreenplayEditor({ onOpenDocuments }) {
                 onCopy={handleCopy}
                 onCut={e => handleCut(e, block, index)}
                 onPaste={e => handlePaste(e, block, index)}
+                hasAnnotation={annotatedTextSet.has(block.text.trim())}
+                onContextMenu={e => handleBlockContextMenu(e, block)}
+                sceneNumber={block.type === 'scene-heading' && activeRevision?.locked_at ? sceneNumberMap[block.text.trim().toUpperCase()] : undefined}
+                hasRevisionChange={block.type === 'scene-heading' && activeRevision?.locked_at ? changedSceneSet.has(block.text.trim().toUpperCase()) : false}
+                revisionColor={activeRevision ? (REVISION_COLORS[activeRevision.draft_color] || REVISION_COLORS.blue) : undefined}
               />
             ))}
           </div>
@@ -1238,7 +1428,7 @@ export default function ScreenplayEditor({ onOpenDocuments }) {
           position: 'absolute',
           top: 12,
           left: sceneNavigatorCollapsed ? 56 : 192,
-          display: 'flex',
+          display: layoutMode === 'focus' ? 'none' : 'flex',
           alignItems: 'center',
           gap: 6,
           zIndex: 20,
@@ -1363,6 +1553,16 @@ export default function ScreenplayEditor({ onOpenDocuments }) {
         )}
       </div>
 
+      {/* Find Bar */}
+      <FindBar
+        matches={findMatches}
+        currentMatchIndex={findMatchIdx}
+        onNext={handleFindNext}
+        onPrev={handleFindPrev}
+        onReplace={handleFindReplace}
+        onReplaceAll={handleFindReplaceAll}
+      />
+
       {/* Suggestions panel */}
       {suggestions.length > 0 && (
         <SuggestionsPanel
@@ -1376,11 +1576,69 @@ export default function ScreenplayEditor({ onOpenDocuments }) {
         blocks={blocks}
         setBlocks={setBlocks}
       />
+
+      {blockContextMenu && (
+        <div
+          style={{
+            position: 'fixed', top: blockContextMenu.y, left: blockContextMenu.x,
+            zIndex: 9000, background: 'var(--bg-raised)',
+            border: '1px solid var(--border)', borderRadius: 6,
+            padding: '4px 0', minWidth: 168,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.45)',
+            fontFamily: 'var(--font-ui)',
+          }}
+          onClick={e => e.stopPropagation()}
+        >
+          <button className="btn btn-ghost btn-sm"
+            style={{ width: '100%', justifyContent: 'flex-start', padding: '7px 14px', borderRadius: 0, border: 'none', fontSize: 12 }}
+            onClick={() => { setBlockContextMenu(null); setAddCommentForm({ block: blockContextMenu.block, text: '' }) }}>
+            ◉ Add Comment
+          </button>
+          <button className="btn btn-ghost btn-sm"
+            style={{ width: '100%', justifyContent: 'flex-start', padding: '7px 14px', borderRadius: 0, border: 'none', fontSize: 12 }}
+            onClick={() => { setBlockContextMenu(null); toggleAnnotationPanel() }}>
+            ≡ View All Comments
+          </button>
+        </div>
+      )}
+
+      {addCommentForm && (
+        <div
+          style={{ position: 'fixed', inset: 0, zIndex: 9001, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.48)' }}
+          onClick={() => setAddCommentForm(null)}
+        >
+          <div
+            style={{ background: 'var(--bg-raised)', border: '1px solid var(--border)', borderRadius: 8, padding: 20, width: 360, boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: 13, color: 'var(--amber)', marginBottom: 10 }}>Add Comment</div>
+            <div style={{ fontFamily: 'var(--font-screenplay)', fontSize: 10, color: 'var(--text-muted)', marginBottom: 10, padding: '6px 8px', background: 'var(--bg-panel)', borderRadius: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              "{addCommentForm.block.text}"
+            </div>
+            <textarea
+              autoFocus
+              value={addCommentForm.text}
+              onChange={e => setAddCommentForm(fm => ({ ...fm, text: e.target.value }))}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSaveComment(addCommentForm.block, addCommentForm.text) }
+                if (e.key === 'Escape') setAddCommentForm(null)
+              }}
+              placeholder="Write a comment… (Enter to save)"
+              rows={3}
+              style={{ width: '100%', background: 'var(--bg-base)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text-primary)', fontFamily: 'var(--font-ui)', fontSize: 12, padding: '8px 10px', resize: 'vertical', marginBottom: 12, boxSizing: 'border-box' }}
+            />
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button className="btn btn-secondary btn-sm" onClick={() => setAddCommentForm(null)}>Cancel</button>
+              <button className="btn btn-primary btn-sm" onClick={() => handleSaveComment(addCommentForm.block, addCommentForm.text)}>Save</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
-function BlockLine({ block, blockIndex, lineNumber, focused, selected, inputRef, onFocus, onMouseDown, onChange, onTypeChange, onChangeBlockType, typeMenuOpen, insertMenuOpen, onToggleInsertMenu, onInsertBlock, onRemoveBlock, insertPlacement, onSetInsertPlacement, onKeyDown, onCopy, onCut, onPaste }) {
+function BlockLine({ block, blockIndex, lineNumber, focused, selected, findMatch, findMatchActive, inputRef, onFocus, onMouseDown, onChange, onTypeChange, onChangeBlockType, typeMenuOpen, insertMenuOpen, onToggleInsertMenu, onInsertBlock, onRemoveBlock, insertPlacement, onSetInsertPlacement, onKeyDown, onCopy, onCut, onPaste, hasAnnotation, onContextMenu, sceneNumber, hasRevisionChange, revisionColor }) {
   const controlsVisible = focused || selected || typeMenuOpen || insertMenuOpen
   const localRef = useRef(null)
   const lineRef = useRef(null)
@@ -1447,11 +1705,12 @@ function BlockLine({ block, blockIndex, lineNumber, focused, selected, inputRef,
       ref={lineRef}
       className="screenplay-line"
       onMouseDown={onMouseDown}
+      onContextMenu={onContextMenu}
       style={{
         position: 'relative',
         borderRadius: 4,
-        outline: selected ? '1px solid var(--amber)' : '1px solid transparent',
-        background: selected ? 'var(--amber-subtle)' : 'transparent',
+        outline: selected ? '1px solid var(--amber)' : findMatchActive ? '2px solid var(--amber)' : findMatch ? '1px solid rgba(200,150,62,0.45)' : '1px solid transparent',
+        background: selected ? 'var(--amber-subtle)' : findMatchActive ? 'rgba(200,150,62,0.22)' : findMatch ? 'rgba(200,150,62,0.09)' : 'transparent',
         ...styleMap[block.type]
       }}
     >
@@ -1474,6 +1733,32 @@ function BlockLine({ block, blockIndex, lineNumber, focused, selected, inputRef,
       >
         L{lineNumber}
       </div>
+
+      {hasAnnotation && (
+        <span
+          style={{ position: 'absolute', right: -24, top: 3, fontSize: 11, color: 'var(--amber)', cursor: 'pointer', userSelect: 'none', opacity: 0.8, lineHeight: 1 }}
+          title="Has comment"
+          onClick={onContextMenu}
+        >
+          ◉
+        </span>
+      )}
+      {sceneNumber !== undefined && (
+        <span
+          style={{ position: 'absolute', left: -52, top: '50%', transform: 'translateY(-50%)', fontSize: 9, fontFamily: 'var(--font-screenplay)', color: 'var(--text-muted)', userSelect: 'none', fontWeight: 700, opacity: 0.75, letterSpacing: '0.03em' }}
+          title={'Scene ' + sceneNumber}
+        >
+          {'A' + sceneNumber}
+        </span>
+      )}
+      {hasRevisionChange && (
+        <span
+          style={{ position: 'absolute', right: -40, top: 0, fontSize: 15, color: revisionColor || 'var(--amber)', userSelect: 'none', opacity: 1, lineHeight: 1, fontWeight: 900 }}
+          title="Changed since locked draft"
+        >
+          *
+        </span>
+      )}
 
       <button
         type="button"

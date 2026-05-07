@@ -10,9 +10,10 @@ const FORMATS = [
 ]
 
 export default function ExportModal({ onClose }) {
-  const { currentProject, currentDocument, addNotification } = useStore()
+  const { currentProject, currentDocument, activeRevision, addNotification } = useStore()
   const [format, setFormat] = useState('fountain')
   const [exporting, setExporting] = useState(false)
+  const [includeRevisionMarks, setIncludeRevisionMarks] = useState(false)
 
   useEffect(() => {
     const handler = (e) => {
@@ -28,7 +29,9 @@ export default function ExportModal({ onClose }) {
     const result = await window.api.exportFile({
       projectId: currentProject.id,
       documentId: currentDocument.id,
-      format
+      format,
+      revisionId: (includeRevisionMarks && activeRevision?.locked_at) ? activeRevision.id : null,
+      includeRevisionMarks: includeRevisionMarks && !!(activeRevision?.locked_at),
     })
     setExporting(false)
     if (result.success) {
@@ -93,6 +96,18 @@ export default function ExportModal({ onClose }) {
             </div>
           ))}
 
+          {activeRevision?.locked_at && (format === 'pdf' || format === 'docx') && (
+            <div
+              onClick={() => setIncludeRevisionMarks(v => !v)}
+              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 8, marginBottom: 8, cursor: 'pointer', background: includeRevisionMarks ? 'var(--amber-subtle)' : 'var(--bg-raised)', border: `1px solid ${includeRevisionMarks ? 'var(--amber)' : 'var(--border)'}`, transition: 'all 0.1s' }}
+            >
+              <input type="checkbox" checked={includeRevisionMarks} onChange={() => {}} style={{ accentColor: 'var(--amber)', cursor: 'pointer' }} />
+              <div>
+                <div style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 600 }}>Include revision marks</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>Scene numbers and change asterisks from the active locked draft</div>
+              </div>
+            </div>
+          )}
           <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
             <button className="btn btn-primary" onClick={handleExport} disabled={exporting} style={{ flex: 1, justifyContent: 'center' }}>
               {exporting ? 'Exporting…' : `Export as ${format.toUpperCase()}`}

@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { id: 'beatsheet', icon: '📊', label: 'Beat Sheet' },
   { id: 'storybible', icon: '📚', label: 'Story Bible' },
   { id: 'brainstorm', icon: '💡', label: 'Brainstorm' },
+  { id: 'cards', icon: '▦', label: 'Scene Cards' },
   { id: 'cameralibrary', icon: '🎥', label: 'Camera Library' },
   { id: 'readthrough', icon: '👁', label: 'Read-Through' },
 ]
@@ -20,7 +21,7 @@ export default function NavRail() {
   const {
     activeWorkspace, setActiveWorkspace,
     navRailOpen,
-    setShowExport, setShowSettings, setShowSnapshots,
+    setShowExport, setShowSettings, setShowSnapshots, setShowRevision,
     setCurrentProject, setDocuments,
   } = useStore()
 
@@ -63,6 +64,12 @@ export default function NavRail() {
           label="Snapshots"
           expanded={expanded}
           onClick={() => setShowSnapshots(true)}
+        />
+        <NavRailItem
+          icon="🎨"
+          label="Revisions"
+          expanded={expanded}
+          onClick={() => setShowRevision(true)}
         />
         <NavRailItem
           icon="⚙"

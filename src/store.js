@@ -43,7 +43,7 @@ const useStore = create((set, get) => ({
 
   setReady: (ready) => set({ ready }),
   setHasApiKey: (v) => set({ hasApiKey: v }),
-  setPreferences: (prefs) => set({ preferences: prefs, theme: prefs.theme || 'dark' }),
+  setPreferences: (prefs) => set({ preferences: prefs, theme: prefs.theme || 'dark', typewriterMode: prefs.typwriterMode ?? false }),
   setTheme: async (theme) => {
     set({ theme })
     const prefs = await window.api.setPreferences({ theme })
@@ -184,6 +184,8 @@ const useStore = create((set, get) => ({
 
   // ─── UI Layout ─────────────────────────────────────────────────────────────
   layoutMode: 'default',
+  typewriterMode: false,
+  typewriterMode: false,
   showChat: false,
   showBible: false,
   showSceneNav: true,
@@ -196,8 +198,19 @@ const useStore = create((set, get) => ({
   showExport: false,
   showSettings: false,
   showSnapshots: false,
+  showRevision: false,
   showCameraLibrary: false,
   activeModal: null,
+
+  revisions: [],
+  activeRevision: null,
+  setRevisions: (v) => set({ revisions: v }),
+  setActiveRevision: (v) => set({ activeRevision: v }),
+  loadRevisions: async (documentId) => {
+    if (!documentId) return
+    const revisions = await window.api.getRevisions(documentId)
+    set({ revisions: revisions || [] })
+  },
 
   // ─── Workspace Navigation ──────────────────────────────────────────────────
   activeWorkspace: 'dashboard',
@@ -209,6 +222,24 @@ const useStore = create((set, get) => ({
   toggleNavRail: () => set(s => ({ navRailOpen: !s.navRailOpen })),
 
   setLayoutMode:         (mode) => set({ layoutMode: mode }),
+  setTypewriterMode:     async (v) => {
+    set({ typewriterMode: v, layoutMode: v ? 'focus' : 'default' })
+    await window.api.setPreferences({ typwriterMode: v })
+  },
+  toggleTypewriterMode:  () => {
+    const next = !get().typewriterMode
+    set({ typewriterMode: next, layoutMode: next ? 'focus' : 'default' })
+    window.api.setPreferences({ typwriterMode: next })
+  },
+  setTypewriterMode:     async (v) => {
+    set({ typewriterMode: v, layoutMode: v ? 'focus' : 'default' })
+    await window.api.setPreferences({ typwriterMode: v })
+  },
+  toggleTypewriterMode:  () => {
+    const next = !get().typewriterMode
+    set({ typewriterMode: next, layoutMode: next ? 'focus' : 'default' })
+    window.api.setPreferences({ typwriterMode: next })
+  },
   toggleChat:            ()     => set(s => ({ showChat: !s.showChat })),
   toggleBible:           ()     => set(s => ({ showBible: !s.showBible })),
   toggleReadThrough:     ()     => set(s => ({ showReadThrough: !s.showReadThrough })),
@@ -220,6 +251,7 @@ const useStore = create((set, get) => ({
   setShowExport:         (v)    => set({ showExport: v }),
   setShowSettings:       (v)    => set({ showSettings: v }),
   setShowSnapshots:      (v)    => set({ showSnapshots: v }),
+  setShowRevision:       (v)    => set({ showRevision: v }),
   setShowCameraLibrary:  (v)    => set({ showCameraLibrary: v }),
   setActiveModal:        (modal)=> set({ activeModal: modal }),
 
@@ -255,6 +287,28 @@ const useStore = create((set, get) => ({
   clearSuggestions:()     => set({ suggestions: [] }),
   activeDiff: null,
   setActiveDiff:   (diff) => set({ activeDiff: diff }),
+
+  // ─── Find & Replace ──────────────────────────────────────────────────────────
+  find: { open: false, query: '', replaceQuery: '', matchCase: false, wholeWord: false },
+  setFind:   (patch) => set(s => ({ find: { ...s.find, ...patch } })),
+  openFind:  ()      => set(s => ({ find: { ...s.find, open: true } })),
+  closeFind: ()      => set(s => ({ find: { ...s.find, open: false, query: '', replaceQuery: '' } })),
+
+  // Annotations
+  annotations: [],
+  annotationPanelOpen: false,
+  annotationJumpAnchor: null,
+
+  setAnnotations: (annotations) => set({ annotations }),
+  setAnnotationPanelOpen: (v) => set({ annotationPanelOpen: v }),
+  toggleAnnotationPanel: () => set(s => ({ annotationPanelOpen: !s.annotationPanelOpen })),
+  setAnnotationJumpAnchor: (text) => set({ annotationJumpAnchor: text }),
+  loadAnnotations: async (documentId) => {
+    if (!documentId) { set({ annotations: [] }); return [] }
+    const list = await window.api.getAnnotations(documentId)
+    set({ annotations: list })
+    return list
+  },
 }))
 
 export default useStore

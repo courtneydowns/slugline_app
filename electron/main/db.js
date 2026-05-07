@@ -5,11 +5,19 @@ const { SCHEMA } = require('./schema')
 
 let db = null
 
+function runMigrations(db) {
+  // Add snapshot_type column if missing (pre-existing DBs)
+  try {
+    db.prepare("ALTER TABLE snapshots ADD COLUMN snapshot_type TEXT DEFAULT 'manual'").run()
+  } catch (_) {}
+}
+
 function getDb() {
   if (db) return db
   const dbPath = path.join(app.getPath('userData'), 'slugline.db')
   db = new Database(dbPath)
   db.exec(SCHEMA)
+  runMigrations(db)
   migrateChatSessions(db)
   migrateDocumentTypes(db)
   migrateSessionSummaries(db)
@@ -528,7 +536,88 @@ function getTokenUsage(projectId) {
   return getDb().prepare('SELECT model, feature, SUM(input_tokens) as input, SUM(output_tokens) as output FROM token_usage GROUP BY model, feature').all()
 }
 
+// ─── Scenes ──────────────────────────────────────────────────────────────────
+
+function getScenesForDocument(documentId) {
+  return getDb().prepare('SELECT * FROM scenes WHERE document_id = ? ORDER BY position ASC').all(documentId)
+}
+
+function syncScenes(documentId, projectId, scenes) {
+  const db = getDb()
+  const run = db.transaction(() => {
+    db.prepare('DELETE FROM scenes WHERE document_id = ?').run(documentId)
+    const insert = db.prepare(
+      'INSERT INTO scenes (document_id, project_id, scene_number, heading, content, location, time_of_day, position) VALUES (?,?,?,?,?,?,?,?)'
+    )
+    scenes.forEach((s, i) => {
+      insert.run(documentId, projectId, i + 1, s.heading, s.content || '', s.location || '', s.time_of_day || '', i)
+    })
+  })
+  run()
+  return { ok: true }
+}
+
 // ─── Full Project Export Data ─────────────────────────────────────────────────
+
+// Annotations
+
+// ─── Revisions ───────────────────────────────────────────────────────────────
+
+function getRevisions(documentId) {
+  return getDb().prepare('SELECT * FROM revisions WHERE document_id = ? ORDER BY created_at ASC').all(documentId)
+}
+
+function getRevision(id) {
+  return getDb().prepare('SELECT * FROM revisions WHERE id = ?').get(id)
+}
+
+function createRevision(documentId, draftColor) {
+  const db = getDb()
+  const existing = db.prepare('SELECT COUNT(*) as cnt FROM revisions WHERE document_id = ?').get(documentId)
+  const draftNumber = (existing?.cnt || 0) + 1
+  const result = db.prepare(
+    'INSERT INTO revisions (document_id, draft_color, draft_number) VALUES (?, ?, ?)'
+  ).run(documentId, draftColor, draftNumber)
+  return db.prepare('SELECT * FROM revisions WHERE id = ?').get(result.lastInsertRowid)
+}
+
+function lockRevision(id, sceneNumberMap, lockedContent) {
+  const db = getDb()
+  db.prepare(
+    'UPDATE revisions SET locked_at = CURRENT_TIMESTAMP, scene_number_map = ?, locked_content = ? WHERE id = ?'
+  ).run(JSON.stringify(sceneNumberMap), lockedContent, id)
+  return db.prepare('SELECT * FROM revisions WHERE id = ?').get(id)
+}
+
+function getAnnotations(documentId) {
+  return getDb().prepare('SELECT * FROM annotations WHERE document_id = ? ORDER BY created_at ASC').all(documentId)
+}
+
+function upsertAnnotation(data) {
+  const db = getDb()
+  if (data.id) {
+    db.prepare('UPDATE annotations SET comment = @comment, updated_at = CURRENT_TIMESTAMP WHERE id = @id').run(data)
+    return db.prepare('SELECT * FROM annotations WHERE id = ?').get(data.id)
+  }
+  const result = db.prepare(
+    'INSERT INTO annotations (document_id, anchor_text, block_type, comment) VALUES (@document_id, @anchor_text, @block_type, @comment)'
+  ).run({
+    document_id: data.document_id,
+    anchor_text: data.anchor_text,
+    block_type: data.block_type || null,
+    comment: data.comment
+  })
+  return db.prepare('SELECT * FROM annotations WHERE id = ?').get(result.lastInsertRowid)
+}
+
+function deleteAnnotation(id) {
+  return getDb().prepare('DELETE FROM annotations WHERE id = ?').run(id)
+}
+
+function resolveAnnotation(id) {
+  getDb().prepare('UPDATE annotations SET resolved = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(id)
+  return getDb().prepare('SELECT * FROM annotations WHERE id = ?').get(id)
+}
 
 function getFullProjectData(projectId) {
   return {
@@ -560,5 +649,8 @@ module.exports = {
   getResearch, addResearch, deleteResearch,
   getTodaySession, upsertSession, getSessionHistory,
   logTokenUsage, getTokenUsage,
-  getFullProjectData
+  getFullProjectData,
+  getScenesForDocument, syncScenes,
+  getAnnotations, upsertAnnotation, deleteAnnotation, resolveAnnotation,
+  getRevisions, getRevision, createRevision, lockRevision
 }

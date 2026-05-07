@@ -32,6 +32,7 @@ export default function TopBar({ onPanic }) {
     setShowExport, setShowSettings, setShowSnapshots,
     setCurrentProject, setDocuments,
     theme, setTheme,
+    typewriterMode, toggleTypewriterMode,
   } = useStore()
 
   const [saveIndicator, setSaveIndicator] = useState('saved')
@@ -70,6 +71,11 @@ export default function TopBar({ onPanic }) {
         e.preventDefault()
         setCommandOpen(v => !v)
       }
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'D' || e.key === 'd')) {
+        e.preventDefault()
+        const ws = useStore.getState().activeWorkspace
+        if (ws === 'editor') useStore.getState().toggleTypewriterMode()
+      }
       if (e.key === 'Escape') setCommandOpen(false)
     }
     window.addEventListener('keydown', handler)
@@ -106,6 +112,7 @@ export default function TopBar({ onPanic }) {
     { id: 'settings', label: 'Settings', icon: '⚙', action: () => setShowSettings(true) },
     { id: 'snapshots', label: 'Snapshots', icon: '📸', action: () => setShowSnapshots(true) },
     { id: 'panic', label: 'Panic Export', icon: '⚡', action: onPanic },
+    { id: 'focusmode', label: typewriterMode ? 'Exit Focus Mode' : 'Focus Mode (Distraction-Free)', icon: '⊟', action: toggleTypewriterMode },
     { id: 'theme', label: theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode', icon: '◑', action: () => setTheme(theme === 'dark' ? 'light' : 'dark') },
     { id: 'projects', label: 'Back to All Projects', icon: '←', action: () => { setCurrentProject(null); setDocuments([]) } },
   ]
@@ -197,6 +204,17 @@ export default function TopBar({ onPanic }) {
               <span>{showChat ? "Hide Chat" : "Show Chat"}</span>
           </button>
 
+          {activeWorkspace === 'editor' && (
+            <button
+              className="topbar-cmd-btn"
+              onClick={toggleTypewriterMode}
+              title={typewriterMode ? 'Exit Focus Mode (⌘⇧D)' : 'Focus Mode (⌘⇧D)'}
+              style={typewriterMode ? { color: 'var(--amber)' } : undefined}
+            >
+              <span style={{ opacity: 0.65, fontSize: 12 }}>&#8862;</span>
+              <span>Focus Mode</span>
+            </button>
+          )}
           <button
             className="topbar-cmd-btn"
             onClick={() => setCommandOpen(true)}
